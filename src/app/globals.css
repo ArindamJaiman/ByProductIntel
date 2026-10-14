@@ -1,0 +1,172 @@
+@import "tailwindcss";
+
+/*
+ * ByProduct Intelligence design tokens.
+ * Concrete-grey surfaces, graphite ink, oxidised copper accent, verdigris for
+ * passing checks. Unknown data is always drawn with the "assay hatch".
+ */
+:root {
+  --ground: #e9e8e3;
+  --panel: #f7f6f3;
+  --panel-sunk: #efeee9;
+  --rule: #cfcdc5;
+  --rule-strong: #a9a69c;
+  --ink: #1e2124;
+  --ink-2: #4c5155;
+  --ink-3: #6b6f72;
+  --copper: #a4511f;
+  --copper-deep: #7f3c15;
+  --copper-wash: #f3e5da;
+  --verdigris: #3f6f5e;
+  --verdigris-wash: #e1ebe5;
+  --oxide: #9b2c2c;
+  --oxide-wash: #f3e1df;
+  --ochre: #8a6a12;
+  --ochre-wash: #f2ead2;
+  --focus: #1d5fa8;
+}
+
+@theme inline {
+  --color-ground: var(--ground);
+  --color-panel: var(--panel);
+  --color-panel-sunk: var(--panel-sunk);
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-copper: var(--copper);
+  --color-copper-deep: var(--copper-deep);
+  --color-copper-wash: var(--copper-wash);
+  --color-verdigris: var(--verdigris);
+  --color-verdigris-wash: var(--verdigris-wash);
+  --color-oxide: var(--oxide);
+  --color-oxide-wash: var(--oxide-wash);
+  --color-ochre: var(--ochre);
+  --color-ochre-wash: var(--ochre-wash);
+  --font-sans: var(--font-archivo), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, monospace;
+}
+
+html {
+  background: var(--ground);
+  color: var(--ink);
+}
+
+body {
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--font-sans);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+}
+
+/* Display type: Archivo at expanded width. */
+.display {
+  font-variation-settings: "wdth" 118;
+  font-weight: 750;
+  letter-spacing: -0.015em;
+  line-height: 1.02;
+}
+.wide {
+  font-variation-settings: "wdth" 112;
+}
+.narrow {
+  font-variation-settings: "wdth" 85;
+}
+
+fieldset {
+  min-width: 0;
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* The assay hatch: the single visual sign for "not known". */
+.hatch {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--ink) 30%, transparent) 0 1.5px,
+    transparent 1.5px 6px
+  );
+}
+.hatch-copper {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    color-mix(in srgb, var(--copper) 55%, transparent) 0 1.5px,
+    transparent 1.5px 6px
+  );
+}
+
+/* Prose for methodology pages. */
+.prose-bpi {
+  max-width: 72ch;
+}
+.prose-bpi h2 {
+  font-variation-settings: "wdth" 112;
+  font-weight: 700;
+  font-size: 1.35rem;
+  margin: 2.25rem 0 0.6rem;
+}
+.prose-bpi h3 {
+  font-weight: 650;
+  font-size: 1.05rem;
+  margin: 1.5rem 0 0.4rem;
+}
+.prose-bpi p,
+.prose-bpi li {
+  color: var(--ink-2);
+  margin: 0.55rem 0;
+}
+.prose-bpi ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+.prose-bpi code {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  background: var(--panel-sunk);
+  padding: 0.05em 0.3em;
+}
+
+/* Tooltip: focusable term with an accessible description. */
+.term {
+  position: relative;
+  border-bottom: 1px dotted var(--ink-3);
+  cursor: help;
+}
+.term > [role="tooltip"] {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 6px);
+  z-index: 30;
+  width: max-content;
+  max-width: min(320px, 80vw);
+  padding: 0.5rem 0.65rem;
+  background: var(--ink);
+  color: var(--panel);
+  font-size: 0.8rem;
+  line-height: 1.4;
+  font-weight: 400;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+}
+.term:hover > [role="tooltip"],
+.term:focus > [role="tooltip"],
+.term:focus-within > [role="tooltip"] {
+  opacity: 1;
+  visibility: visible;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms !important;
+    animation-duration: 0ms !important;
+  }
+}
