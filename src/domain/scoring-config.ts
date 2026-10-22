@@ -9,7 +9,7 @@ import type { CircularityTier, ScenarioAssumptions } from "./types";
  * matching runs remain reproducible against the model that produced them.
  */
 export const SCORING_MODEL_VERSION = "bpi-score-0.1.0";
-export const ENGINE_VERSION = "bpi-engine-0.1.0";
+export const ENGINE_VERSION = "bpi-engine-0.2.0";
 
 export type ScoreComponentKey =
   | "technical"

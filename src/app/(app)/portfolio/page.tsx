@@ -61,6 +61,14 @@ async function PortfolioContent() {
 
       <Panel title="Where the tonnes go" aside="Baseline assumptions, best pathway per material">
         <FlowDiagram flows={p.flows} appNames={appNames} />
+        {t.transportTco2ePerYear > 0 ? (
+          <p className="mt-3 border-t border-rule pt-3 text-sm text-ink-2">
+            Moving the placed tonnes by road would add about <span className="font-semibold text-ink">{fmtNumber(t.transportTco2ePerYear)} t CO₂e a year</span>,
+            tank-to-wheel, using the{" "}
+            <Link href="/evidence#src-glec-v32-india-road" className="text-copper hover:underline">GLEC v3.2 Indian heavy-truck factor</Link>. Emissions avoided by
+            displacing primary materials are not estimated.
+          </p>
+        ) : null}
       </Panel>
 
       <Panel title="Producer companies" aside={`${p.organisations.length} in this workspace`}>

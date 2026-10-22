@@ -58,6 +58,8 @@ def main():
     os.environ["BPI_DEMO_STORE_PATH"] = env_store
     os.environ["BPI_DATA_MODE"] = "demo"
     os.environ["BASE_URL"] = f"http://localhost:{PORT}"
+    # Keep the run deterministic and offline: outside services stay off even if .env.local has keys.
+    os.environ["BPI_DISABLE_EXTERNAL_SERVICES"] = "1"
     run("npm run seed")
     os.environ["PYTHONIOENCODING"] = "utf-8"
     if os.environ.get("E2E_REBUILD", "1") == "1" or not (ROOT / ".next" / "BUILD_ID").exists():

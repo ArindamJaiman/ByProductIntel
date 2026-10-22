@@ -4,6 +4,7 @@ import { EmptyState, PageHeader, buttonStyles } from "@/components/ui";
 import { FAMILY_SHORT } from "@/domain/labels";
 import { validateMaterial } from "@/domain/validation";
 import { requireContext } from "@/server/context";
+import { ROUTING_ATTRIBUTION, routedLegs, routingConfigured } from "@/server/routing";
 
 export const metadata = { title: "Scenarios" };
 
@@ -31,6 +32,9 @@ async function ScenarioContent({ searchParams }: { searchParams: SP }) {
   if (materials.length === 0) return <EmptyState title="No materials yet" />;
   const material = materials.find((m) => m.id === one(sp.material)) ?? materials[0];
   const validation = validateMaterial(material);
+  const routes = routingConfigured()
+    ? Object.fromEntries(Object.entries(await routedLegs(material, applications)).map(([id, leg]) => [id, leg.km]))
+    : null;
 
   return (
     <>
@@ -50,7 +54,15 @@ async function ScenarioContent({ searchParams }: { searchParams: SP }) {
           {validation.issues.filter((i) => i.severity === "error").map((i) => i.message).join(" ")} Fix the profile before exploring scenarios.
         </EmptyState>
       ) : (
-      <ScenarioLab key={material.id} material={material} applications={applications} initialFocus={one(sp.focus) || undefined} baseRunId={one(sp.run) || undefined} />
+      <ScenarioLab
+        key={material.id}
+        material={material}
+        applications={applications}
+        initialFocus={one(sp.focus) || undefined}
+        baseRunId={one(sp.run) || undefined}
+        routes={routes}
+        routingAttribution={ROUTING_ATTRIBUTION}
+      />
       )}
     </>
   );

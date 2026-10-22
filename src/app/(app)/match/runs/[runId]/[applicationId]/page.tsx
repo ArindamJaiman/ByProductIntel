@@ -21,13 +21,15 @@ import {
   th,
 } from "@/components/ui";
 import type { Check, CheckStage } from "@/domain/engine/result-types";
+import { evaluateMatch } from "@/domain/engine/evaluate";
 import { breakEven, sensitivity } from "@/domain/engine/sensitivity";
-import { BRIDGE_CATEGORY_LABELS, REVIEWER_LABELS } from "@/domain/labels";
+import { BRIDGE_CATEGORY_LABELS, REVIEWER_LABELS, STATE_LABELS } from "@/domain/labels";
 import { SHORTLIST_STATUS_LABELS } from "@/domain/records";
 import { ECONOMIC_ANCHORS_INR_PER_T } from "@/domain/scoring-config";
 import { fmtDateTime, fmtInr, fmtInrCompact, fmtNumber } from "@/lib/format";
 import { addReviewNoteAction } from "@/server/actions";
 import { requireContext } from "@/server/context";
+import { ROUTING_ATTRIBUTION, roadDistanceKm, routingConfigured } from "@/server/routing";
 
 export const metadata = { title: "Match details" };
 
@@ -65,12 +67,17 @@ async function DetailContent({ params }: { params: Promise<{ runId: string; appl
   const src = new Map(evidence.map((e) => [e.id, e]));
   const entry = shortlist.find((s) => s.materialId === m.id && s.applicationId === applicationId);
   const history = decisions.filter((d) => d.materialId === m.id);
-  const citedIds = [...new Set([...r.checks.map((c) => c.sourceId), ...r.bridge.map((b) => b.sourceId), ...app.sourceIds].filter(Boolean) as string[])];
+  const citedIds = [
+    ...new Set([...r.checks.map((c) => c.sourceId), ...r.bridge.map((b) => b.sourceId), ...app.sourceIds, r.environment.transportEmissions?.sourceId].filter(Boolean) as string[]),
+  ];
   const e = r.economics;
   const blockers = r.bridge.filter((b) => b.blocking && b.category !== "human_review");
   const fits = r.checks.filter((c) => c.status === "pass" && c.stage === "specification");
 
   const be = breakEven(r, app);
+  // When this run estimated the distance, compare it with a real road route, re-running the engine at that distance.
+  const routedKm = e.distanceBasis === "great_circle_x_factor" && routingConfigured() ? await roadDistanceKm(m.location, e.demandSite) : null;
+  const atRoute = routedKm === null ? null : evaluateMatch(m, app, { ...e.assumptions, routedDistanceKm: routedKm }, run.weights);
   const bars = e.annualNetInr === null ? [] : sensitivity(m, app, e.assumptions, run.weights);
 
   const stages = (Object.keys(STAGE_TITLES) as CheckStage[]).map((s) => ({ stage: s, checks: r.checks.filter((c) => c.stage === s) })).filter((s) => s.checks.length);
@@ -208,7 +215,11 @@ async function DetailContent({ params }: { params: Promise<{ runId: string; appl
               <dd className="text-right">{e.demandSite.label}, {e.demandSite.region}</dd>
               <dt className="text-ink-3">Distance basis</dt>
               <dd className="text-right">
-                {e.distanceBasis === "override" ? "User override" : `Great-circle ${fmtNumber(e.greatCircleKm)} km × ${e.assumptions.roadCircuityFactor} circuity`}
+                {e.distanceBasis === "override"
+                  ? "User override"
+                  : e.distanceBasis === "routed"
+                    ? "Road route, heavy goods vehicle (OpenRouteService)"
+                    : `Great-circle ${fmtNumber(e.greatCircleKm)} km × ${e.assumptions.roadCircuityFactor} circuity`}
               </dd>
               <dt className="text-ink-3">Offered / recovery fraction</dt>
               <dd className="text-right">{fmtNumber(e.offeredTonnes)} t/yr × {e.assumptions.recoveryFraction}</dd>
@@ -217,6 +228,24 @@ async function DetailContent({ params }: { params: Promise<{ runId: string; appl
               <dt className="text-ink-3">Economic score anchors</dt>
               <dd className="text-right">{fmtInr(ECONOMIC_ANCHORS_INR_PER_T.floor)} → 0, {fmtInr(ECONOMIC_ANCHORS_INR_PER_T.ceiling)} → 1</dd>
             </dl>
+            {routedKm !== null && atRoute && e.distanceKm !== null ? (
+              <div className="mt-3 border-l-2 border-copper bg-copper-wash px-3 py-2 text-sm">
+                <div className="font-semibold">Road route check</div>
+                <p className="text-ink-2">
+                  The road route is {fmtNumber(routedKm)} km for a heavy goods vehicle, {Math.abs(Math.round((routedKm / e.distanceKm - 1) * 100))} %{" "}
+                  {routedKm >= e.distanceKm ? "longer" : "shorter"} than the {fmtNumber(e.distanceKm)} km estimate used here. At that distance the net would be{" "}
+                  <span className={cx("font-semibold", (atRoute.economics.perTonne.net ?? 0) < 0 && "text-oxide")}>{fmtInr(atRoute.economics.perTonne.net, "/t")}</span>
+                  {atRoute.state !== r.state ? (
+                    <>
+                      {" "}
+                      and the pathway would be <span className="font-semibold">{STATE_LABELS[atRoute.state].toLowerCase()}</span>
+                    </>
+                  ) : null}
+                  . Use road routes in the scenario view to save a run on this basis.
+                </p>
+                <p className="mt-1 text-[11px] text-ink-3">{ROUTING_ATTRIBUTION}</p>
+              </div>
+            ) : null}
             <p className="mt-3 text-xs text-ink-3">Prices, processing costs and freight rates are illustrative demo assumptions. Theoretical revenue is not realised savings.</p>
           </Panel>
 
@@ -237,7 +266,27 @@ async function DetailContent({ params }: { params: Promise<{ runId: string; appl
                 </dd>
               </div>
               <div>
-                <dt className="font-semibold">Greenhouse-gas effect</dt>
+                <dt className="font-semibold">Transport emissions</dt>
+                <dd className="mt-0.5">
+                  {r.environment.transportEmissions?.tonnesCo2ePerYear != null ? (
+                    <span className="wide text-xl font-bold">{fmtNumber(r.environment.transportEmissions.tonnesCo2ePerYear)} t CO₂e/yr </span>
+                  ) : (
+                    <span className="font-semibold text-ink-2">Not estimated. </span>
+                  )}
+                  <span className="text-ink-2">
+                    {r.environment.transportEmissions
+                      ? `${r.environment.transportEmissions.explanation} ${r.environment.transportEmissions.boundary}`
+                      : "This run was made before transport emissions were added (engine 0.2.0). Run the analysis again to see them."}
+                  </span>
+                  {r.environment.transportEmissions && src.get(r.environment.transportEmissions.sourceId) ? (
+                    <Link href={`/evidence#${r.environment.transportEmissions.sourceId}`} className="mt-0.5 block text-xs text-copper hover:underline">
+                      Source: {src.get(r.environment.transportEmissions.sourceId)!.title}
+                    </Link>
+                  ) : null}
+                </dd>
+              </div>
+              <div>
+                <dt className="font-semibold">Avoided emissions</dt>
                 <dd className="mt-0.5 text-ink-2">{r.environment.ghg.reason}</dd>
               </div>
             </dl>

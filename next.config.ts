@@ -12,6 +12,10 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   cacheComponents: true,
   partialPrefetching: true,
+  experimental: {
+    // Lab report uploads are capped at 4 MB in code; this leaves room for form overhead within Vercel's 4.5 MB request limit.
+    serverActions: { bodySizeLimit: "4.5mb" },
+  },
   turbopack: {
     rules: {
       "*.css": {

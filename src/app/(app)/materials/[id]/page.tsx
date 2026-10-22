@@ -70,7 +70,11 @@ async function MaterialContent({ params, searchParams }: { params: Promise<{ id:
   return (
     <>
       {sp.saved ? (
-        <p role="status" className="mb-4 border border-verdigris/40 bg-verdigris-wash px-4 py-2 text-sm text-verdigris">Material profile saved.</p>
+        <p role="status" className="mb-4 border border-verdigris/40 bg-verdigris-wash px-4 py-2 text-sm text-verdigris">
+          {sp.saved === "report"
+            ? "Values from the lab report saved. Run the match analysis again to see their effect."
+            : "Material profile saved."}
+        </p>
       ) : null}
       <PageHeader
         kicker={<Link href="/materials" className="hover:text-copper">Materials registry</Link>}
@@ -79,6 +83,7 @@ async function MaterialContent({ params, searchParams }: { params: Promise<{ id:
         actions={
           <>
             <ButtonLink href={`/materials/${material.id}/edit`}>Edit profile</ButtonLink>
+            <ButtonLink href={`/materials/${material.id}/read-report`}>Read a lab report</ButtonLink>
             <ButtonLink href={`/materials/${material.id}/passport`}>Evidence passport</ButtonLink>
             <ButtonLink href={`/scenarios?material=${material.id}`}>Explore scenarios</ButtonLink>
             <form action={runMatchAction}>

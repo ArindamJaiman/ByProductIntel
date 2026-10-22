@@ -22,11 +22,16 @@ export function ScenarioLab({
   applications,
   initialFocus,
   baseRunId,
+  routes = null,
+  routingAttribution,
 }: {
   material: Material;
   applications: Application[];
   initialFocus?: string;
   baseRunId?: string;
+  /** Routed road distances by application id, or null when road routing is not configured. */
+  routes?: Record<string, number> | null;
+  routingAttribution?: string;
 }) {
   const [rate, setRate] = useState(String(DEFAULT_ASSUMPTIONS.transportCostInrPerTonneKm));
   const [circuity, setCircuity] = useState(String(DEFAULT_ASSUMPTIONS.roadCircuityFactor));
@@ -34,6 +39,7 @@ export function ScenarioLab({
   const [overrides, setOverrides] = useState<Overrides>({});
   const [weights, setWeights] = useState<ScoreWeights>(DEFAULT_WEIGHTS);
   const [label, setLabel] = useState("Scenario: adjusted assumptions");
+  const [useRoutes, setUseRoutes] = useState(false);
 
   const baseline = useMemo(
     () => runMatching({ material, applications, scenario: { label: "Baseline", defaults: DEFAULT_ASSUMPTIONS, perApplication: {} } }).results.filter(inScope),
@@ -56,6 +62,10 @@ export function ScenarioLab({
       const p = toNum(o.materialPriceInrPerTonneOverride);
       if (d !== null || p !== null) perApplication[id] = { distanceKmOverride: d, materialPriceInrPerTonneOverride: p };
     }
+    // Routed distances apply where there is no manual distance override.
+    if (useRoutes && routes) {
+      for (const [id, km] of Object.entries(routes)) perApplication[id] = { ...perApplication[id], routedDistanceKm: km };
+    }
     try {
       resolveAssumptions(defaults, undefined);
       for (const o of Object.values(perApplication)) resolveAssumptions(defaults, o);
@@ -63,7 +73,7 @@ export function ScenarioLab({
     } catch (e) {
       return { error: (e as Error).message };
     }
-  }, [rate, circuity, recovery, overrides, weights, label]);
+  }, [rate, circuity, recovery, overrides, weights, label, useRoutes, routes]);
 
   const deferred = useDeferredValue(built);
   const scenarioResults = useMemo(() => {
@@ -117,6 +127,21 @@ export function ScenarioLab({
                 <input className={cx(field, "w-20")} inputMode="decimal" value={recovery} onChange={(e) => setRecovery(e.target.value)} aria-label="Recovery fraction value" />
               </div>
             </label>
+            {routes ? (
+              <div className="border-t border-rule pt-3">
+                <label className="flex items-start gap-2">
+                  <input type="checkbox" className="mt-1" checked={useRoutes} onChange={(e) => setUseRoutes(e.target.checked)} />
+                  <span>
+                    Use road routes for distance
+                    <span className="block text-xs text-ink-3">
+                      Heavy goods vehicle routes for {Object.keys(routes).length} of {scopeApps.length} pathways, instead of straight-line distance × circuity. Manual
+                      distance overrides still win.
+                    </span>
+                  </span>
+                </label>
+                {routingAttribution ? <p className="mt-1 text-[11px] text-ink-3">{routingAttribution}</p> : null}
+              </div>
+            ) : null}
             <p className="text-xs text-ink-3">All values are assumptions you set. None of them is a quotation or a measured saving.</p>
           </div>
         </fieldset>
@@ -135,7 +160,13 @@ export function ScenarioLab({
                   <div className="mt-1 grid grid-cols-2 gap-2">
                     <label className="text-xs">
                       Distance km
-                      <input className={field} inputMode="decimal" placeholder={fmtNumber(b.economics.distanceKm)} value={o.distanceKmOverride} onChange={(e) => update({ distanceKmOverride: e.target.value })} />
+                      <input
+                        className={field}
+                        inputMode="decimal"
+                        placeholder={fmtNumber(useRoutes && routes?.[a.id] !== undefined ? routes[a.id] : b.economics.distanceKm)}
+                        value={o.distanceKmOverride}
+                        onChange={(e) => update({ distanceKmOverride: e.target.value })}
+                      />
                     </label>
                     <label className="text-xs">
                       Price ₹/t

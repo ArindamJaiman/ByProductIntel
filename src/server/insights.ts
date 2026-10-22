@@ -61,6 +61,8 @@ export interface PortfolioInsights {
     screenedValueInr: number;
     pendingValueInr: number;
     materialsWithoutPathway: number;
+    /** Road transport emissions of the lead pathways, where they can be estimated. */
+    transportTco2ePerYear: number;
   };
 }
 
@@ -140,6 +142,7 @@ export const portfolioInsights = cache(async (repo: Repository): Promise<Portfol
       screenedValueInr: sum("screenedValueInr"),
       pendingValueInr: sum("pendingValueInr"),
       materialsWithoutPathway: positions.filter((p) => !p.lead).length,
+      transportTco2ePerYear: positions.reduce((n, p) => n + (p.lead?.environment.transportEmissions?.tonnesCo2ePerYear ?? 0), 0),
     },
   };
 });

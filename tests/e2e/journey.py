@@ -122,7 +122,7 @@ def run_match(page: Page):
     page.wait_for_url(re.compile(r".*/match/runs/[0-9a-f-]+$"))
     state["run_url"] = page.url
     expect(page.get_by_role("link", name="Granular sub-base for road pavements", exact=True)).to_be_visible()
-    expect(page.get_by_text("bpi-engine-0.1.0")).to_be_visible()
+    expect(page.get_by_text("bpi-engine-0.2.0")).to_be_visible()
     ranks = page.locator("ol > li [aria-label^='Rank']").all_inner_texts()
     assert ranks[:2] == ["1", "2"], ranks
     expect(page.get_by_text("Ranking holds when the weights change")).to_be_visible()
@@ -217,6 +217,9 @@ def break_even(page: Page):
     expect(panel).to_contain_text("stays positive up to 373 km")
     expect(panel).to_contain_text("the economics bind first")
     expect(panel).to_contain_text("Ineligible at +25 %")
+    env = page.locator("section", has_text="Environmental estimate")
+    expect(env).to_contain_text("t CO₂e/yr")
+    expect(env).to_contain_text("Avoided emissions")
     shot(page, "15-break-even")
 
 
@@ -246,7 +249,18 @@ def test_planner(page: Page):
     assert [order.index(n) for n in names] == sorted(order.index(n) for n in names), order
     expect(page.get_by_text("Completes: Manufactured soil ingredient")).to_be_visible()
     expect(page.get_by_text("1 of 1 assessable")).to_be_visible()
+    expect(page.get_by_role("link", name="Report back? Read it in").first).to_be_visible()
     shot(page, "17-test-planner")
+
+
+@step("Lab report reader degrades cleanly without a key, and the sample report downloads")
+def report_reader(page: Page):
+    go(page, "/materials/mat-mill-scale")
+    page.get_by_role("link", name="Read a lab report").click()
+    page.wait_for_url("**/read-report")
+    expect(page.get_by_text("The lab report reader is not configured on this server")).to_be_visible()
+    resp = page.request.get(BASE + "/samples/synthetic-oil-grease-report-msc-001.pdf")
+    assert resp.status == 200 and resp.headers.get("content-type", "").startswith("application/pdf"), resp.status
 
 
 @step("Group portfolio: flows, pooling and who needs to act")
@@ -367,7 +381,7 @@ def not_found(page: Page):
 def mobile(page: Page):
     page.set_viewport_size({"width": 375, "height": 812})
     offenders = []
-    for path in ["/", "/dashboard", "/portfolio", "/test-plan", "/materials", "/materials/mat-bof-slag-weathered", "/materials/mat-bof-slag-weathered/passport",
+    for path in ["/", "/dashboard", "/portfolio", "/test-plan", "/materials", "/materials/mat-bof-slag-weathered", "/materials/mat-bof-slag-weathered/passport", "/materials/mat-mill-scale/read-report",
                  "/applications", state["run_url"].replace(BASE, ""), state["run_url"].replace(BASE, "") + "/app-granular-subbase",
                  state["gbs_run"].replace(BASE, "") + "/app-ggbs-cement", state["compare_url"].replace(BASE, ""),
                  "/scenarios?material=mat-gbfs", "/shortlist", "/evidence", "/methodology"]:
@@ -396,7 +410,7 @@ def main():
             else None,
         )
         for fn in [landing, dashboard, registry, profile, run_match, details, shortlist, compare, scenarios, break_even, run_compare,
-                   test_planner, portfolio, passport, incomplete, evidence, dashboard_after, create_material, csv_import, not_found, mobile]:
+                   test_planner, report_reader, portfolio, passport, incomplete, evidence, dashboard_after, create_material, csv_import, not_found, mobile]:
             fn(page)
         browser.close()
 

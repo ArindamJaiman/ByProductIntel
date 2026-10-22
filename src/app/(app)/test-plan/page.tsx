@@ -145,7 +145,17 @@ async function TestPlanContent({ searchParams }: { searchParams: SP }) {
                     </div>
                     <div className="pb-6">
                       <ItemHeading item={s.item} />
-                      <p className="mt-1 text-sm text-ink-2">Supplies: {s.item.covers.join("; ")}.</p>
+                      <p className="mt-1 text-sm text-ink-2">
+                        Supplies: {s.item.covers.join("; ")}.
+                        {s.item.kind === "laboratory_package" || s.item.kind === "measurement" ? (
+                          <>
+                            {" "}
+                            <Link href={`/materials/${selected.material.id}/read-report`} className="font-semibold text-copper hover:underline print:hidden">
+                              Report back? Read it in
+                            </Link>
+                          </>
+                        ) : null}
+                      </p>
                       <p className="mt-1 text-sm">
                         {s.completes.length ? (
                           <>

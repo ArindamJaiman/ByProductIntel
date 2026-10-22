@@ -1,3 +1,4 @@
+import { INDIA_ROAD_FREIGHT_HCV } from "../emission-factors";
 import type { Application, Material, ScenarioAssumptions } from "../types";
 import type { EconomicsResult, EnvironmentResult } from "./result-types";
 import { nearest } from "./geo";
@@ -23,9 +24,10 @@ export function resolveAssumptions(
     "materialPriceInrPerTonneOverride",
     "processingCostInrPerTonneOverride",
     "currentHandlingCostInrPerTonneOverride",
+    "routedDistanceKm",
   ] as const) {
     const v = merged[k];
-    if (v !== null && !(Number.isFinite(v) && v >= 0)) throw new RangeError(`${k} must be a non-negative number or null`);
+    if (v !== null && v !== undefined && !(Number.isFinite(v) && v >= 0)) throw new RangeError(`${k} must be a non-negative number or null`);
   }
   return merged;
 }
@@ -42,7 +44,8 @@ export function computeEconomics(
   a: ScenarioAssumptions,
 ): EconomicsResult {
   const { site, km: gcKm } = nearest(material.location, app.demandSites);
-  const distanceKm = a.distanceKmOverride ?? round(gcKm * a.roadCircuityFactor, 1);
+  const routed = a.routedDistanceKm ?? null;
+  const distanceKm = a.distanceKmOverride ?? routed ?? round(gcKm * a.roadCircuityFactor, 1);
   const missingInputs: string[] = [];
   const notes: string[] = [];
 
@@ -79,7 +82,7 @@ export function computeEconomics(
     notes,
     demandSite: site,
     distanceKm,
-    distanceBasis: a.distanceKmOverride !== null ? "override" : "great_circle_x_factor",
+    distanceBasis: a.distanceKmOverride !== null ? "override" : routed !== null ? "routed" : "great_circle_x_factor",
     greatCircleKm: round(gcKm, 1),
     offeredTonnes: offered,
     acceptedTonnes,
@@ -122,14 +125,27 @@ export function computeEnvironment(material: Material, econ: EconomicsResult): E
         "Scenario estimate: tonnes per year that could move from the current disposal or stockpile pathway if the exchange proceeded under these assumptions (offered tonnes × recovery fraction, capped at the recipient's maximum demand). Not a measured outcome.",
     };
   }
+  const tonneKm = accepted !== null && econ.distanceKm !== null ? round(accepted * econ.distanceKm) : null;
+  const f = INDIA_ROAD_FREIGHT_HCV;
   return {
     diversion,
-    transportActivityTonneKm:
-      accepted !== null && econ.distanceKm !== null ? round(accepted * econ.distanceKm) : null,
+    transportActivityTonneKm: tonneKm,
+    transportEmissions: {
+      status: tonneKm === null ? "not_computed" : "estimated",
+      tonnesCo2ePerYear: tonneKm === null ? null : round((tonneKm * f.kgCo2ePerTonneKm) / 1000),
+      factorId: f.id,
+      kgCo2ePerTonneKm: f.kgCo2ePerTonneKm,
+      boundary: f.boundary,
+      sourceId: f.sourceId,
+      explanation:
+        tonneKm === null
+          ? "Cannot be estimated because the accepted tonnes or the distance are unknown."
+          : `Emissions added by moving the accepted tonnes by road: tonne-km × ${f.kgCo2ePerTonneKm} kg CO2e per tonne-km (${f.label}). A cost of the exchange, not a saving.`,
+    },
     ghg: {
       status: "not_estimated",
       reason:
-        "No emissions figure is shown. A defensible estimate needs a system boundary, sourced emission factors for the displaced primary material, processing energy and transport, and allocation rules for the by-product.",
+        "Emissions avoided by displacing a primary material are not estimated. A defensible figure needs a defined system boundary, sourced emission factors for the displaced material and the processing energy, and allocation rules for the by-product.",
     },
   };
 }

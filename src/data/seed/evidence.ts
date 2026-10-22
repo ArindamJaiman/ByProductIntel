@@ -10,6 +10,21 @@ const ACCESSED = "2026-10-14";
 
 export const EVIDENCE_SOURCES: EvidenceSource[] = [
   {
+    id: "src-glec-v32-india-road",
+    title: "GLEC Framework v3.2 (2025), Table 13: Indian road emission intensity values",
+    organisation: "Smart Freight Centre, Global Logistics Emissions Council; read through the Climatiq data explorer listing",
+    url: "https://www.climatiq.io/data/emission-factor/c7a88c2f-c642-4440-a979-8ed757e80dc0",
+    publicationDate: "2025",
+    accessDate: "2026-10-22",
+    evidenceType: "secondary_summary",
+    relevantTo: ["Road freight", "Transport emissions"],
+    claim:
+      "Heavy commercial vehicle in India, 30–50 t GVW (20–40 t payload), diesel, average load: 0.0509 kg CO2e per tonne-km, tank-to-wheel. The value incorporates average loads and empty running, and road values include a 5 % distance uplift for out-of-route travel.",
+    reviewStatus: "secondary_only",
+    caveat:
+      "Read from a third-party listing, not from the GLEC default-values workbook, which is restricted. Tank-to-wheel only: fuel production is excluded. GLEC intends the value for the shortest feasible distance; this prototype's road distance already includes a circuity factor, so its transport emissions may be slightly overstated.",
+  },
+  {
     id: "src-fhwa-steel-slag-base",
     title: "User Guidelines for Waste and Byproduct Materials in Pavement Construction — Steel Slag, Granular Base",
     organisation: "U.S. Federal Highway Administration (Report FHWA-RD-97-148)",

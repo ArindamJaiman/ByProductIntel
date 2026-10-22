@@ -220,6 +220,11 @@ export interface ScenarioAssumptions {
   recoveryFraction: number;
   /** Optional overrides — null means "use the record value". */
   distanceKmOverride: number | null;
+  /**
+   * Road distance from a routing service for this material and demand site.
+   * Used when there is no manual override. Absent means "estimate it".
+   */
+  routedDistanceKm?: number | null;
   tonnesOfferedOverride: number | null;
   materialPriceInrPerTonneOverride: number | null;
   processingCostInrPerTonneOverride: number | null;

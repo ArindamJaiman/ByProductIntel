@@ -62,7 +62,7 @@ export interface EconomicsResult {
   notes: string[];
   demandSite: DemandSite;
   distanceKm: number | null;
-  distanceBasis: "override" | "great_circle_x_factor";
+  distanceBasis: "override" | "routed" | "great_circle_x_factor";
   greatCircleKm: number;
   offeredTonnes: number | null;
   acceptedTonnes: number | null;
@@ -79,6 +79,17 @@ export interface EnvironmentResult {
     explanation: string;
   };
   transportActivityTonneKm: number | null;
+  /** Emissions added by road transport of the accepted tonnes. Absent on runs made before engine 0.2.0. */
+  transportEmissions?: {
+    status: "estimated" | "not_computed";
+    tonnesCo2ePerYear: number | null;
+    factorId: string;
+    kgCo2ePerTonneKm: number;
+    boundary: string;
+    sourceId: string;
+    explanation: string;
+  };
+  /** Emissions avoided by displacing primary material. Deliberately not estimated. */
   ghg: { status: "not_estimated"; reason: string };
 }
 

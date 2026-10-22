@@ -57,6 +57,7 @@ const ASSUMPTION_LABELS: Record<keyof ScenarioAssumptions, string> = {
   roadCircuityFactor: "Road circuity factor",
   recoveryFraction: "Recovery fraction",
   distanceKmOverride: "Distance override (km)",
+  routedDistanceKm: "Routed road distance (km)",
   tonnesOfferedOverride: "Tonnes offered override",
   materialPriceInrPerTonneOverride: "Material price override (₹/t)",
   processingCostInrPerTonneOverride: "Processing cost override (₹/t)",

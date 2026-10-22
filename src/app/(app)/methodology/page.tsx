@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { BasisTag, PageHeader, StateBadge } from "@/components/ui";
+import { INDIA_ROAD_FREIGHT_HCV } from "@/domain/emission-factors";
 import { PRIORITY_RULES } from "@/domain/engine/bridge";
 import { weightVariants } from "@/domain/engine/robustness";
 import { SENSITIVITY_DELTA } from "@/domain/engine/sensitivity";
@@ -115,10 +116,16 @@ export default function MethodologyPage() {
 
         <h2>Stage 6: environmental effects</h2>
         <p>
-          The engine reports two things it can state without a life-cycle model: the tonnes that could be diverted from a disposal or stockpile
-          pathway under the scenario (only when the current pathway is disposal or stockpiling), and transport activity in tonne-kilometres. It does
-          not report greenhouse-gas savings. A defensible figure needs a defined system boundary, sourced emission factors for the displaced primary
-          material, processing and transport, and allocation rules for the by-product. The circularity component is an ordinal tier (
+          The engine reports three things: the tonnes that could be diverted from a disposal or stockpile pathway under the scenario (only when the
+          current pathway is disposal or stockpiling), transport activity in tonne-kilometres, and the emissions that road transport adds. Transport
+          emissions are tonne-km × {INDIA_ROAD_FREIGHT_HCV.kgCo2ePerTonneKm} kg CO₂e per tonne-km, the{" "}
+          <Link href={`/evidence#${INDIA_ROAD_FREIGHT_HCV.sourceId}`} className="text-copper underline">GLEC Framework v3.2 value</Link> for an Indian heavy
+          commercial vehicle at average load. That value is tank-to-wheel, so fuel production is excluded, and it is a cost of the exchange, not a saving.
+        </p>
+        <p>
+          The engine does not report emissions avoided by displacing primary material. A defensible figure needs a defined system boundary, sourced
+          emission factors for the displaced material and the processing energy, and allocation rules for the by-product. The circularity component is
+          an ordinal tier (
           {Object.entries(CIRCULARITY_TIER_VALUE)
             .map(([k, v]) => `${CIRCULARITY_TIER_LABEL[k as keyof typeof CIRCULARITY_TIER_LABEL].split(" (")[0].toLowerCase()} = ${v}`)
             .join("; ")}
@@ -176,6 +183,23 @@ export default function MethodologyPage() {
           A source qualifies when its only failed hard rule is the recipient&apos;s minimum offtake. Qualifying sources of the same material family that
           deliver to the same demand site are grouped, and a pool is shown when their combined volume meets the minimum. Pools never cross families,
           the engine does not infer the properties of a blend, and each member keeps its own outstanding items.
+        </p>
+
+        <h3>Lab report reader</h3>
+        <p>
+          An uploaded report is sent to Google&apos;s Gemini model, which is asked only to transcribe printed results: parameter, value, unit as printed,
+          method, page and the exact line it read. The app then checks every result itself. A value must appear in its quoted line, its unit is mapped
+          by code to one valid for the property, plausibility ranges apply, and results printed as limits (for example &ldquo;&lt;0.05&rdquo;) are not saved
+          automatically. Nothing reaches the profile until a person ticks each value and confirms it against the report. Saved values are recorded as
+          user-supplied and laboratory-reported, with a note that they were transcribed with AI assistance. The model never scores, ranks or decides.
+        </p>
+
+        <h3>Road routes</h3>
+        <p>
+          By default distance is estimated as great-circle distance × a circuity factor, so results do not depend on an outside service. Where road
+          routing is configured, the scenario view can use heavy goods vehicle routes from OpenRouteService instead, and each match page compares its
+          estimate with the routed distance. A run saved with routes stores the distances it used, so it can be reproduced. Routes © openrouteservice.org
+          by HeiGIT, map data © OpenStreetMap contributors.
         </p>
 
         <h3>Group portfolio, evidence passport and run comparison</h3>

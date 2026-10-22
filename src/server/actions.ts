@@ -10,6 +10,7 @@ import { DEFAULT_ASSUMPTIONS, DEFAULT_WEIGHTS, normaliseWeights } from "@/domain
 import type { Material, Scenario } from "@/domain/types";
 import { materialInputSchema, validateMaterial, type MaterialInput } from "@/domain/validation";
 import { getContext } from "./context";
+import { routedLegs } from "./routing";
 
 export interface FormState {
   ok: boolean;
@@ -126,6 +127,7 @@ const scenarioSchema = z.object({
     z.string(),
     z.object({
       distanceKmOverride: z.number().min(0).max(5000).nullable().optional(),
+      routedDistanceKm: z.number().min(0).max(10000).nullable().optional(),
       materialPriceInrPerTonneOverride: z.number().min(0).nullable().optional(),
       processingCostInrPerTonneOverride: z.number().min(0).nullable().optional(),
     }),
@@ -154,6 +156,16 @@ export async function runMatchAction(formData: FormData): Promise<void> {
     const parsed = scenarioSchema.safeParse(JSON.parse(String(rawScenario)));
     if (!parsed.success) throw new Error("Scenario assumptions are invalid.");
     scenario = parsed.data;
+  }
+  // Routed distances are looked up here, never taken from the browser.
+  const wantsRoutes = Object.values(scenario.perApplication).some((o) => o.routedDistanceKm !== undefined);
+  if (wantsRoutes) {
+    const legs = await routedLegs(material, await repo.listApplications());
+    for (const [id, o] of Object.entries(scenario.perApplication)) {
+      if (o.routedDistanceKm === undefined) continue;
+      if (legs[id]) o.routedDistanceKm = legs[id].km;
+      else delete o.routedDistanceKm;
+    }
   }
   let weights = DEFAULT_WEIGHTS;
   const rawWeights = formData.get("weights");
