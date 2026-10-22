@@ -7,7 +7,6 @@ import type { CircularityTier, ScenarioAssumptions } from "./types";
  * They are not industry-validated constants. Any change to a weight, anchor
  * or rule in this file must bump SCORING_MODEL_VERSION so that stored
  * matching runs remain reproducible against the model that produced them.
- * See docs/matching-model.md.
  */
 export const SCORING_MODEL_VERSION = "bpi-score-0.1.0";
 export const ENGINE_VERSION = "bpi-engine-0.1.0";

@@ -49,3 +49,10 @@ next-env.d.ts
 # e2e artefacts
 /tests/e2e/artifacts/
 __pycache__/
+
+# local tooling, notes and the pitch video project
+/.claude/
+/.agents/
+/skills-lock.json
+/videos/
+*.md

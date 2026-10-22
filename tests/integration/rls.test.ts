@@ -4,7 +4,7 @@
  * row-level security isolates organisations and protects reference data.
  *
  * This verifies the SQL and policies; it does not exercise Supabase Auth,
- * PostgREST or the network path. See docs/limitations.md.
+ * PostgREST or the network path.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

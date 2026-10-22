@@ -154,10 +154,20 @@ export default function MethodologyPage() {
           <li>Real prices, freight rates, buyer demand, or contractual terms.</li>
           <li>Life-cycle emissions or other environmental impacts.</li>
         </ul>
-        <p>
-          Laboratory testing, expert technical review and regulatory confirmation remain necessary before any by-product is used. See{" "}
-          <code>docs/limitations.md</code> in the repository for the full list.
-        </p>
+
+        <h2>Known model limitations</h2>
+        <ul>
+          <li>
+            Most thresholds are demonstration assumptions. Only a few are source-referenced, and those come from secondary summaries or another
+            jurisdiction. Results show how the method behaves, not whether a real material suits a real use.
+          </li>
+          <li>Rules are single-property thresholds. Grading curves, mix design, combined chemistry and sample-to-sample variability are not modelled.</li>
+          <li>Leaching is checked only as &ldquo;report present or absent&rdquo;. No leachate values are evaluated.</li>
+          <li>Distances are straight-line × a circuity factor, not routed, and only road transport is modelled.</li>
+          <li>Economics are per-tonne linear estimates with no capex, contracts, taxes or price elasticity.</li>
+          <li>Score weights and anchors are not industry-validated.</li>
+        </ul>
+        <p>Laboratory testing, expert technical review and regulatory confirmation remain necessary before any by-product is used.</p>
       </div>
     </>
   );

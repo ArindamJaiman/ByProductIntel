@@ -22,7 +22,7 @@ import { summariseRun, type Actor, type Repository } from "./types";
  *
  * Status: type-checked and mapped against the migration schema; the SQL and
  * policies are tested in PGlite, but this adapter has not been exercised
- * against a live Supabase project in this environment (docs/limitations.md).
+ * against a live Supabase project yet.
  */
 
 type Row = Record<string, unknown>;

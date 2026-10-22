@@ -8,7 +8,7 @@ import type { Material, Measurement } from "@/domain/types";
  * state of each value so that the engine's handling of verification can be
  * demonstrated; the UI labels these as simulated.
  *
- * Coverage of engine behaviours (see docs/data-provenance.md):
+ * Coverage of engine behaviours:
  *  - BPI-DEMO-SLG-001 → promising candidate blocked by missing leaching evidence (sub-base);
  *                       failed hard constraint (concrete aggregate, free lime)
  *  - BPI-DEMO-SLG-002 → potentially eligible (sub-base); failed expansion (concrete)

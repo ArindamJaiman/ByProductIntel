@@ -12,6 +12,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Local tooling and the pitch video project are not part of the app.
+    ".claude/**",
+    ".agents/**",
+    "videos/**",
   ]),
 ]);
 
