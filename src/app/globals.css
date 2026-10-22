@@ -162,6 +162,20 @@ fieldset {
   visibility: visible;
 }
 
+/* Printed dossiers: plain paper, no app chrome, sections kept whole. */
+@media print {
+  @page {
+    margin: 14mm;
+  }
+  html,
+  body {
+    background: #fff;
+  }
+  .print-avoid-break {
+    break-inside: avoid;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

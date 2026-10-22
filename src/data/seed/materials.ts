@@ -17,6 +17,8 @@ import type { Material, Measurement } from "@/domain/types";
  *  - BPI-DEMO-FSD-001 → insufficient data for a score (manufactured soil)
  *  - BPI-DEMO-GBS-001 → economics unattractive at long transport distance (GGBS)
  *  - BPI-DEMO-MSC-001 → incomplete environmental evidence (oil content); volume below minimum (sinter)
+ *  - BPI-DEMO-MSC-002 → potentially eligible (iron corrective); below minimum alone but poolable
+ *                       with MSC-001 for the same sinter plant
  */
 
 const SEEDED_AT = "2026-09-01T09:00:00.000Z";
@@ -37,6 +39,7 @@ export const ORGANISATIONS = [
   { id: "org-demo-foundry-south", name: "Southern Demo Iron Foundry (synthetic)", kind: "producer" },
   { id: "org-demo-steel-coast", name: "Coastal Demo Ironworks (synthetic)", kind: "producer" },
   { id: "org-demo-rolling-central", name: "Central Demo Rolling Mill (synthetic)", kind: "producer" },
+  { id: "org-demo-bar-mill-central", name: "Central Demo Bar and Rod Mill (synthetic)", kind: "producer" },
   { id: "org-demo-user", name: "Your organisation (demo workspace)", kind: "workspace" },
 ] as const;
 
@@ -250,5 +253,30 @@ export const MATERIALS: Material[] = [
     ],
     createdAt: SEEDED_AT,
     updatedAt: "2026-08-02T12:00:00.000Z",
+  },
+  {
+    id: "mat-mill-scale-bar",
+    code: "BPI-DEMO-MSC-002",
+    name: "Mill scale, bar and rod mill",
+    family: "mill_scale",
+    sourceProcess: "Hot rolling of bars and rods; scale collected from descaling and roll-stand pits",
+    description: "Synthetic profile of a second, smaller mill scale source in the same industrial belt as BPI-DEMO-MSC-001.",
+    organisationId: "org-demo-bar-mill-central",
+    dataOrigin: "synthetic_demo",
+    location: { site: "Scale yard (synthetic)", region: "Urla, Raipur, Chhattisgarh", country: "India", lat: 21.29, lon: 81.6 },
+    volume: { tonnesPerYear: 30000, reportingPeriod: "FY 2025–26 (simulated)", provenance: "synthetic_demo" },
+    hazard: { status: "declared_non_hazardous", basis: "Classification report (simulated)", verification: "lab_reported" },
+    currentHandling: { pathway: "Stockpiled in the scale yard", kind: "disposal_or_stockpile", costInrPerTonne: 60, provenance: "synthetic_demo" },
+    measurements: [
+      m("fe_total", 69.8, "%", "lab_reported", { documentId: "doc-msc2-chem" }),
+      m("oil_content", 0.35, "%", "lab_reported", { method: "Solvent extraction (simulated)", documentId: "doc-msc2-oil" }),
+      m("max_particle_size", 6, "mm", "self_declared"),
+    ],
+    documents: [
+      { id: "doc-msc2-chem", type: "chemical_composition_report", title: "Iron assay (simulated)", status: "available_unverified", issuedBy: "Demo laboratory (synthetic)", date: "2026-07-08", provenance: "synthetic_demo" },
+      { id: "doc-msc2-oil", type: "oil_grease_analysis", title: "Oil and grease analysis (simulated)", status: "available_unverified", issuedBy: "Demo laboratory (synthetic)", date: "2026-07-08", provenance: "synthetic_demo" },
+    ],
+    createdAt: SEEDED_AT,
+    updatedAt: "2026-09-12T15:40:00.000Z",
   },
 ];

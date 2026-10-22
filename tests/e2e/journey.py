@@ -3,8 +3,10 @@ End-to-end browser journey for ByProduct Intelligence (demo mode).
 
 Run through tests/e2e/run_e2e.py, which seeds an isolated demo store, builds
 and starts the production server, then executes this script. It follows the
-14-step demonstration workflow from the product brief plus validation, CSV
-import, incomplete-data handling and mobile overflow checks. Any failed
+14-step demonstration workflow from the product brief plus the decision tools
+(test planner, break-even and sensitivity, rank robustness, run comparison,
+group portfolio with pooling, evidence passport), validation, CSV import,
+incomplete-data handling and mobile overflow checks. Any failed
 assertion, browser console error, page error or failed request fails the run.
 """
 
@@ -67,6 +69,9 @@ def landing(page: Page):
     expect(page.locator("h1")).to_contain_text("evidence")
     expect(page.get_by_text("Status: Promising candidate — technical review required.")).to_be_visible()
     expect(page.get_by_text("independent concept prototype")).to_be_visible()
+    tools = page.locator("section", has_text="From one match to a portfolio decision")
+    expect(tools).to_contain_text("breaks even up to 373 km")
+    expect(tools).to_contain_text("25 and 30 kt/yr")
     shot(page, "01-landing")
     page.get_by_role("link", name="Open the demo").first.click()
     page.wait_for_url("**/dashboard")
@@ -78,7 +83,7 @@ def dashboard(page: Page):
     expect(page.get_by_text("Demo mode: synthetic data stored in a local file")).to_be_visible()
     state["awaiting_before"] = stat_value(page, "Promising, awaiting review")
     assert state["awaiting_before"] > 0
-    assert stat_value(page, "Material profiles") == 7
+    assert stat_value(page, "Material profiles") == 8
     shot(page, "02-dashboard")
 
 
@@ -87,10 +92,10 @@ def registry(page: Page):
     go(page, "/materials")
     page.get_by_label("Search name, code or category").fill("BOF")
     page.get_by_role("button", name="Apply").click()
-    expect(page.get_by_text("1 of 7 materials")).to_be_visible()
+    expect(page.get_by_text("1 of 8 materials")).to_be_visible()
     assert "q=BOF" in page.url, page.url
     go(page, "/materials?family=fly_ash")
-    expect(page.get_by_text("2 of 7 materials")).to_be_visible()
+    expect(page.get_by_text("2 of 8 materials")).to_be_visible()
     go(page, "/materials?sort=volume")
     first = page.locator("tbody tr").first.inner_text()
     assert "Dry fly ash" in first, first
@@ -120,6 +125,7 @@ def run_match(page: Page):
     expect(page.get_by_text("bpi-engine-0.1.0")).to_be_visible()
     ranks = page.locator("ol > li [aria-label^='Rank']").all_inner_texts()
     assert ranks[:2] == ["1", "2"], ranks
+    expect(page.get_by_text("Ranking holds when the weights change")).to_be_visible()
     shot(page, "05-run-results")
     page.get_by_label("Feasibility state").select_option("ineligible")
     page.get_by_role("button", name="Apply").click()
@@ -197,6 +203,77 @@ def scenarios(page: Page):
     page.get_by_role("button", name="Save as run").click()
     page.wait_for_url(re.compile(r".*/match/runs/[0-9a-f-]+$"))
     expect(page.get_by_text("E2E: nearer grinding unit").first).to_be_visible()
+
+
+@step("Break-even and sensitivity explain where a case stops paying")
+def break_even(page: Page):
+    go(page, "/materials/mat-gbfs")
+    page.get_by_role("button", name="Run match analysis").click()
+    page.wait_for_url(re.compile(r".*/match/runs/[0-9a-f-]+$"))
+    state["gbs_run"] = page.url
+    page.goto(state["gbs_run"] + "/app-ggbs-cement")
+    page.wait_for_load_state("networkidle")
+    panel = page.locator("section", has_text="Break-even and sensitivity")
+    expect(panel).to_contain_text("stays positive up to 373 km")
+    expect(panel).to_contain_text("the economics bind first")
+    expect(panel).to_contain_text("Ineligible at +25 %")
+    shot(page, "15-break-even")
+
+
+@step("Run comparison attributes the score change to the changed assumption")
+def run_compare(page: Page):
+    page.goto(state["gbs_run"])
+    picker = page.get_by_label("Compare with another run of this material")
+    picker.select_option(picker.locator("option", has_text="E2E: nearer grinding unit").get_attribute("value"))
+    page.get_by_role("button", name="Compare runs").click()
+    page.wait_for_url("**/compare?with=**")
+    state["compare_url"] = page.url
+    expect(page.get_by_text("Distance override (km) 250")).to_be_visible()
+    # The scenario run was saved first, so moving to the later baseline run loses the 24 points.
+    expect(page.get_by_text("−24.0")).to_be_visible()
+    expect(page.get_by_text("1 of 2 in-scope pathways changed")).to_be_visible()
+    shot(page, "16-run-compare")
+
+
+@step("Test planner names the single test that unlocks the most value")
+def test_planner(page: Page):
+    go(page, "/test-plan")
+    first = page.locator("tbody tr").first.inner_text()
+    assert "Oil and grease analysis" in first and "₹2.51 crore" in first, first
+    go(page, "/test-plan?material=mat-foundry-sand")
+    order = page.locator("main ol").first.inner_text()
+    names = ["Hazard classification", "Heavy metals analysis", "Leaching test report"]
+    assert [order.index(n) for n in names] == sorted(order.index(n) for n in names), order
+    expect(page.get_by_text("Completes: Manufactured soil ingredient")).to_be_visible()
+    expect(page.get_by_text("1 of 1 assessable")).to_be_visible()
+    shot(page, "17-test-planner")
+
+
+@step("Group portfolio: flows, pooling and who needs to act")
+def portfolio(page: Page):
+    go(page, "/portfolio")
+    expect(page.locator("figure svg title").first).to_contain_text("Registered by-product tonnes")
+    pooling = page.locator("#pooling")
+    expect(pooling).to_contain_text("Mill scale for Iron-bearing feed for sinter plants")
+    expect(pooling).to_contain_text("55,000")
+    expect(pooling).to_contain_text("Still needs on its own: Oil and grease content")
+    expect(page.get_by_text("Who needs to act")).to_be_visible()
+    shot(page, "18-portfolio")
+
+
+@step("Evidence passport is a complete, printable record")
+def passport(page: Page):
+    go(page, "/materials/mat-bof-slag-weathered")
+    page.get_by_role("link", name="Evidence passport").click()
+    page.wait_for_url("**/passport")
+    expect(page.get_by_text("Material evidence passport")).to_be_visible()
+    expect(page.get_by_text(re.compile(r"Record fingerprint [0-9a-f]{8}"))).to_be_visible()
+    expect(page.locator("main")).to_contain_text("Commission next: Leaching test report")
+    page.emulate_media(media="print")
+    expect(page.locator("aside").first).to_be_hidden()
+    expect(page.get_by_role("button", name="Print or save as PDF")).to_be_hidden()
+    page.emulate_media(media="screen")
+    shot(page, "19-passport")
 
 
 @step("Incomplete data shows 'Insufficient data' rather than a number")
@@ -290,8 +367,10 @@ def not_found(page: Page):
 def mobile(page: Page):
     page.set_viewport_size({"width": 375, "height": 812})
     offenders = []
-    for path in ["/", "/dashboard", "/materials", "/materials/mat-bof-slag-weathered", "/applications", state["run_url"].replace(BASE, ""),
-                 state["run_url"].replace(BASE, "") + "/app-granular-subbase", "/scenarios?material=mat-gbfs", "/shortlist", "/evidence", "/methodology"]:
+    for path in ["/", "/dashboard", "/portfolio", "/test-plan", "/materials", "/materials/mat-bof-slag-weathered", "/materials/mat-bof-slag-weathered/passport",
+                 "/applications", state["run_url"].replace(BASE, ""), state["run_url"].replace(BASE, "") + "/app-granular-subbase",
+                 state["gbs_run"].replace(BASE, "") + "/app-ggbs-cement", state["compare_url"].replace(BASE, ""),
+                 "/scenarios?material=mat-gbfs", "/shortlist", "/evidence", "/methodology"]:
         go(page, path)
         sw, iw = page.evaluate("[document.documentElement.scrollWidth, window.innerWidth]")
         if sw > iw + 1:
@@ -316,8 +395,8 @@ def main():
             if r.status >= 400 and "does-not-exist" not in r.url
             else None,
         )
-        for fn in [landing, dashboard, registry, profile, run_match, details, shortlist, compare, scenarios, incomplete, evidence,
-                   dashboard_after, create_material, csv_import, not_found, mobile]:
+        for fn in [landing, dashboard, registry, profile, run_match, details, shortlist, compare, scenarios, break_even, run_compare,
+                   test_planner, portfolio, passport, incomplete, evidence, dashboard_after, create_material, csv_import, not_found, mobile]:
             fn(page)
         browser.close()
 

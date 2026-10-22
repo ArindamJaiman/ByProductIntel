@@ -1,7 +1,7 @@
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { APPLICATIONS, EVIDENCE_SOURCES, ORGANISATIONS } from "@/data/seed";
+import { APPLICATIONS, EVIDENCE_SOURCES, MATERIALS, ORGANISATIONS, SEED_VERSION } from "@/data/seed";
 import type { AuditEvent, ReviewDecision, StoredRun } from "@/domain/records";
 import type { Material } from "@/domain/types";
 import type { MaterialInput } from "@/domain/validation";
@@ -53,6 +53,7 @@ async function load(): Promise<DemoState> {
   try {
     const parsed = JSON.parse(await readWithRetry(STORE_PATH)) as DemoState;
     if (parsed.schemaVersion !== 1) throw new Error("Unsupported demo store version");
+    if (parsed.seedVersion !== SEED_VERSION) await upgradeSeed(parsed);
     return parsed;
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== "ENOENT" && !(err instanceof SyntaxError)) throw err;
@@ -62,6 +63,24 @@ async function load(): Promise<DemoState> {
     });
     return structuredClone(await initialising);
   }
+}
+
+/** Add seed materials introduced since the store was created. Existing records, including edits, are left alone. */
+async function upgradeSeed(state: DemoState): Promise<void> {
+  const known = new Set(state.materials.map((m) => m.id));
+  const added = MATERIALS.filter((m) => !known.has(m.id));
+  state.materials.push(...structuredClone(added));
+  state.seedVersion = SEED_VERSION;
+  if (added.length) {
+    audit(state, {
+      eventType: "seed_loaded",
+      entityType: "dataset",
+      entityId: SEED_VERSION,
+      summary: `Synthetic demo dataset updated: added ${added.map((m) => m.code).join(", ")}`,
+      actor: "System",
+    });
+  }
+  await save(state);
 }
 
 async function save(state: DemoState): Promise<void> {

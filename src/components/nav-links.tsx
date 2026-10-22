@@ -6,7 +6,13 @@ import { Suspense } from "react";
 import { cx } from "./ui";
 
 export const NAV_GROUPS = [
-  { label: "Overview", items: [{ href: "/dashboard", label: "Dashboard" }] },
+  {
+    label: "Overview",
+    items: [
+      { href: "/dashboard", label: "Dashboard" },
+      { href: "/portfolio", label: "Group portfolio" },
+    ],
+  },
   {
     label: "Registry",
     items: [
@@ -18,6 +24,7 @@ export const NAV_GROUPS = [
     label: "Analysis",
     items: [
       { href: "/match", label: "Matching workspace" },
+      { href: "/test-plan", label: "Test planner" },
       { href: "/scenarios", label: "Scenarios" },
     ],
   },

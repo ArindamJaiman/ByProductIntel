@@ -31,11 +31,13 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
       <a href="#main" className="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:bg-panel focus:p-2">
         Skip to content
       </a>
-      <Suspense fallback={<p className="h-7 bg-copper-wash" aria-hidden />}>
-        <ModeStrip />
-      </Suspense>
+      <div className="print:hidden">
+        <Suspense fallback={<p className="h-7 bg-copper-wash" aria-hidden />}>
+          <ModeStrip />
+        </Suspense>
+      </div>
       <div className="flex flex-1">
-        <aside className="hidden w-60 shrink-0 border-r border-rule bg-panel-sunk px-3 py-5 md:block">
+        <aside className="hidden w-60 shrink-0 border-r border-rule bg-panel-sunk px-3 py-5 md:block print:hidden">
           <div className="mb-7 px-3">
             <Brand href="/dashboard" />
           </div>
@@ -44,11 +46,11 @@ export default function AppLayout({ children }: LayoutProps<"/">) {
           </Suspense>
         </aside>
         <div className="flex min-w-0 flex-1 flex-col">
-          <div className="flex items-center justify-between border-b border-rule bg-panel-sunk px-4 py-3 md:hidden">
+          <div className="flex items-center justify-between border-b border-rule bg-panel-sunk px-4 py-3 md:hidden print:hidden">
             <Brand href="/dashboard" />
             <MobileNav />
           </div>
-          <main id="main" className="mx-auto w-full max-w-[1240px] flex-1 px-4 py-6 md:px-8 md:py-8">
+          <main id="main" className="mx-auto w-full max-w-[1240px] flex-1 px-4 py-6 md:px-8 md:py-8 print:max-w-none print:p-0">
             {children}
           </main>
         </div>

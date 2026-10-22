@@ -2,10 +2,10 @@
 
 import Link from "next/link";
 import { useDeferredValue, useMemo, useState } from "react";
-import { evaluateMatch } from "@/domain/engine/evaluate";
 import { resolveAssumptions } from "@/domain/engine/economics";
 import type { MatchResult } from "@/domain/engine/result-types";
 import { runMatching } from "@/domain/engine/run";
+import { SENSITIVITY_DELTA, sensitivity as sensitivityBars } from "@/domain/engine/sensitivity";
 import { COMPONENT_LABELS, DEFAULT_ASSUMPTIONS, DEFAULT_WEIGHTS, normaliseWeights, type ScoreComponentKey, type ScoreWeights } from "@/domain/scoring-config";
 import type { Application, Material, Scenario, ScenarioAssumptions } from "@/domain/types";
 import { fmtInr, fmtNumber } from "@/lib/format";
@@ -16,39 +16,6 @@ import { StateBadge, buttonStyles, cx } from "./ui";
 type Overrides = Record<string, { distanceKmOverride: string; materialPriceInrPerTonneOverride: string }>;
 const toNum = (s: string) => (s.trim() === "" ? null : Number(s));
 const inScope = (r: MatchResult) => r.checks.find((c) => c.id === "identity")?.status !== "fail";
-
-interface Variable {
-  key: "price" | "rate" | "distance" | "processing" | "handling";
-  label: string;
-}
-const VARIABLES: Variable[] = [
-  { key: "price", label: "Material price" },
-  { key: "rate", label: "Transport cost per t·km" },
-  { key: "distance", label: "Transport distance" },
-  { key: "processing", label: "Processing cost" },
-  { key: "handling", label: "Avoided handling cost" },
-];
-
-/** Net per tonne for one variable scaled by `factor`, recomputed by the engine itself. */
-function netWith(material: Material, app: Application, base: ScenarioAssumptions, baseline: MatchResult, v: Variable["key"], factor: number): number | null {
-  const e = baseline.economics;
-  const a: ScenarioAssumptions = { ...base };
-  if (v === "price") {
-    if (e.perTonne.price === null) return null;
-    a.materialPriceInrPerTonneOverride = e.perTonne.price * factor;
-  } else if (v === "rate") a.transportCostInrPerTonneKm = base.transportCostInrPerTonneKm * factor;
-  else if (v === "distance") {
-    if (e.distanceKm === null) return null;
-    a.distanceKmOverride = e.distanceKm * factor;
-  } else if (v === "processing") {
-    if (e.perTonne.processing === null) return null;
-    a.processingCostInrPerTonneOverride = e.perTonne.processing * factor;
-  } else {
-    if (e.perTonne.avoidedHandling === null) return null;
-    a.currentHandlingCostInrPerTonneOverride = e.perTonne.avoidedHandling * factor;
-  }
-  return evaluateMatch(material, app, a, baseline.score.weights).economics.perTonne.net;
-}
 
 export function ScenarioLab({
   material,
@@ -109,13 +76,14 @@ export function ScenarioLab({
   const sensitivity = useMemo(() => {
     if (!focusApp || !focusScenario || !deferred.scenario || focusScenario.economics.perTonne.net === null) return null;
     const base = resolveAssumptions(deferred.scenario.defaults, deferred.scenario.perApplication[focusApp.id]);
-    const rows = VARIABLES.map((v) => {
-      const lo = netWith(material, focusApp, base, focusScenario, v.key, 0.75);
-      const hi = netWith(material, focusApp, base, focusScenario, v.key, 1.25);
-      return { ...v, lo, hi, swing: lo === null || hi === null ? 0 : Math.abs(hi - lo) };
-    }).sort((a, b) => b.swing - a.swing);
-    const maxSwing = Math.max(1, ...rows.map((r) => Math.max(Math.abs((r.lo ?? 0) - focusScenario.economics.perTonne.net!), Math.abs((r.hi ?? 0) - focusScenario.economics.perTonne.net!))));
-    return { rows, maxSwing, net: focusScenario.economics.perTonne.net };
+    const net = focusScenario.economics.perTonne.net;
+    // Same one-at-a-time engine re-run as the match page, read here as net ₹ per tonne.
+    const rows = sensitivityBars(material, focusApp, base, focusScenario.score.weights)
+      .filter((b) => b.key !== "recovery")
+      .map((b) => ({ key: b.key, label: b.label, lo: b.low.netPerTonneInr, hi: b.high.netPerTonneInr, swing: Math.abs((b.high.netPerTonneInr ?? 0) - (b.low.netPerTonneInr ?? 0)) }))
+      .sort((a, b) => b.swing - a.swing || a.key.localeCompare(b.key));
+    const maxSwing = Math.max(1, ...rows.map((r) => Math.max(Math.abs((r.lo ?? 0) - net), Math.abs((r.hi ?? 0) - net))));
+    return { rows, maxSwing, net };
   }, [focusApp, focusScenario, deferred, material]);
 
   const field = "w-full border border-rule-strong bg-panel px-2 py-1.5 text-sm";
@@ -271,7 +239,7 @@ export function ScenarioLab({
         <section className="border border-rule bg-panel">
           <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-rule px-4 py-2.5">
             <h2 className="text-[0.95rem] font-semibold">What drives the result: {focusApp?.name ?? "select a candidate"}</h2>
-            <span className="text-sm text-ink-3">Net ₹/t when each input moves ±25 %, others held</span>
+            <span className="text-sm text-ink-3">Net ₹/t when each input moves ±{SENSITIVITY_DELTA * 100} %, others held</span>
           </div>
           <div className="p-4">
             {!sensitivity ? (

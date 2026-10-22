@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { BasisTag, PageHeader, StateBadge } from "@/components/ui";
 import { PRIORITY_RULES } from "@/domain/engine/bridge";
+import { weightVariants } from "@/domain/engine/robustness";
+import { SENSITIVITY_DELTA } from "@/domain/engine/sensitivity";
 import {
   CIRCULARITY_TIER_LABEL,
   CIRCULARITY_TIER_VALUE,
@@ -138,6 +140,50 @@ export default function MethodologyPage() {
           it. Actions never state a numeric limit that is not already in the application&apos;s rules, and no action can override a failed safety or
           regulatory constraint. Processing routes are shown as possibilities to test, not as fixes.
         </p>
+
+        <h2>Decision tools built on the same engine</h2>
+        <p>Each tool below re-uses the engine&apos;s own results. None of them can change a state, relax a rule or produce an approval.</p>
+
+        <h3>Test planner</h3>
+        <p>
+          For each material, every hard or safety-critical item that is still unknown is mapped to what would supply it: a laboratory package, a
+          single measurement, a producer declaration or a recipient specification. Measurements are grouped with the report that normally carries
+          them, for example total chromium and lead with a heavy metals analysis. That grouping is an assumption and never marks anything as measured.
+        </p>
+        <ul>
+          <li>An item &ldquo;completes&rdquo; a pathway when it is the only thing outstanding there. A completed pathway is <em>assessable</em>, not eligible: the new result can still fail.</li>
+          <li>Items are ranked by pathways completed alone, then indicative value at stake, then pathways gated. The recommended order is greedy, taking the item that completes the most pathways at each step.</li>
+          <li>Pathways with a known hard failure are left out, because no test changes a known failure.</li>
+        </ul>
+
+        <h3>Break-even and sensitivity</h3>
+        <p>
+          From the economics formula, the break-even road distance is (price + avoided handling − processing) ÷ freight rate. The same rearrangement
+          gives the highest freight rate, lowest price and highest processing cost that still break even. Sensitivity moves each input{" "}
+          {SENSITIVITY_DELTA * 100} % down and up, one at a time, and re-runs the full engine, so a move that crosses a transport limit shows up as a
+          change of state.
+        </p>
+
+        <h3>Rank robustness</h3>
+        <p>
+          A run&apos;s actionable candidates are re-ranked under {weightVariants(DEFAULT_WEIGHTS).length} weight sets: the run&apos;s own, equal weights, and
+          each weight halved and raised by half (re-normalised). Component values are reused unchanged. A ranking is reported as holding when the same
+          candidate leads under every set; otherwise the weight sets that overturn it are listed.
+        </p>
+
+        <h3>Pooling finder</h3>
+        <p>
+          A source qualifies when its only failed hard rule is the recipient&apos;s minimum offtake. Qualifying sources of the same material family that
+          deliver to the same demand site are grouped, and a pool is shown when their combined volume meets the minimum. Pools never cross families,
+          the engine does not infer the properties of a blend, and each member keeps its own outstanding items.
+        </p>
+
+        <h3>Group portfolio, evidence passport and run comparison</h3>
+        <ul>
+          <li>The portfolio counts each material once, against its best ranked pathway (or, failing that, one still awaiting evidence), so tonnes and value are never double-counted. Value totals include only pathways with a positive indicative net.</li>
+          <li>The evidence passport is a printable record of one material: every value with provenance, documents, screening outcomes and open actions, with a fingerprint that changes whenever the record does.</li>
+          <li>Run comparison lists every input that differs between two stored runs of one material and the effect on each pathway&apos;s state, score and individual checks.</li>
+        </ul>
 
         <h2>Sources and data status</h2>
         <p>

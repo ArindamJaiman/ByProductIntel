@@ -3,8 +3,12 @@ import { BridgeSpan } from "@/components/bridge-span";
 import { Brand } from "@/components/brand";
 import { BasisTag, buttonStyles, StateBadge } from "@/components/ui";
 import { APPLICATIONS, DEFAULT_SCENARIO, MATERIALS } from "@/data/seed";
+import { findPoolingOpportunities } from "@/domain/engine/pooling";
 import { runMatching } from "@/domain/engine/run";
-import { lowerFirst } from "@/domain/labels";
+import { breakEven } from "@/domain/engine/sensitivity";
+import { buildTestPlan } from "@/domain/engine/test-plan";
+import { FAMILY_SHORT, lowerFirst } from "@/domain/labels";
+import { fmtNumber } from "@/lib/format";
 import { COMPONENT_LABELS, DEFAULT_WEIGHTS, type ScoreComponentKey } from "@/domain/scoring-config";
 
 // Engine output for one synthetic profile, computed from the seed data at render time.
@@ -13,6 +17,41 @@ const heroApp = APPLICATIONS.find((a) => a.id === "app-granular-subbase")!;
 const heroResult = runMatching({ material: heroMaterial, applications: [heroApp], scenario: DEFAULT_SCENARIO }).results[0];
 const heroPass = heroResult.checks.filter((c) => c.stage === "specification" && c.status === "pass");
 const heroBlocker = heroResult.bridge.find((b) => b.blocking && b.category !== "human_review")!;
+
+// Live examples for the decision tools, also computed from the synthetic seed.
+const seedResults = new Map(MATERIALS.map((m) => [m.id, runMatching({ material: m, applications: APPLICATIONS, scenario: DEFAULT_SCENARIO }).results]));
+const appName = (id: string) => APPLICATIONS.find((a) => a.id === id)!.name;
+const sandPlan = buildTestPlan("mat-foundry-sand", seedResults.get("mat-foundry-sand")!);
+const ggbs = seedResults.get("mat-gbfs")!.find((r) => r.applicationId === "app-ggbs-cement")!;
+const ggbsEven = breakEven(ggbs, APPLICATIONS.find((a) => a.id === "app-ggbs-cement")!);
+const pool = findPoolingOpportunities(MATERIALS, APPLICATIONS, seedResults)[0];
+
+const TOOLS = [
+  {
+    title: "Test planner",
+    href: "/test-plan",
+    text: `Ranks outstanding evidence by how many pathways each test makes assessable. For the synthetic foundry sand it orders ${sandPlan.sequence
+      .map((s) => lowerFirst(s.item.label))
+      .join(", then ")}, after which ${lowerFirst(appName(sandPlan.sequence.at(-1)!.completes[0]))} can be assessed.`,
+  },
+  {
+    title: "Break-even and sensitivity",
+    href: `/scenarios?material=mat-gbfs&focus=app-ggbs-cement`,
+    text: `Solves where each case stops paying. Synthetic granulated slag to cement breaks even up to ${fmtNumber(ggbsEven.breakEvenDistanceKm)} km by road; the nearest grinding unit is ${fmtNumber(ggbsEven.currentDistanceKm)} km away.`,
+  },
+  {
+    title: "Pooling finder",
+    href: "/portfolio#pooling",
+    text: pool
+      ? `Finds small sources that only miss a buyer's minimum volume. Two synthetic ${FAMILY_SHORT[pool.family].toLowerCase()} sources of ${pool.members.map((m) => fmtNumber(m.offeredTonnes / 1000)).join(" and ")} kt/yr together meet a ${fmtNumber(pool.minTonnes / 1000)} kt/yr ${lowerFirst(appName(pool.applicationId))} minimum.`
+      : "Finds small sources that only miss a buyer's minimum volume and could meet it together.",
+  },
+  {
+    title: "Group portfolio",
+    href: "/portfolio",
+    text: "One view across every producer company: where each stream's tonnes go, the value awaiting evidence, and who has to act next. Each material counts once.",
+  },
+] as const;
 
 const WEIGHT_RATIONALE: Record<ScoreComponentKey, string> = {
   technical: "Share of measured specification requirements that pass.",
@@ -167,8 +206,28 @@ export default function LandingPage() {
           </div>
         </section>
 
+        {/* Decision tools */}
+        <section className="mx-auto max-w-[1180px] px-4 py-16 md:px-8">
+          <h2 className="wide text-3xl font-bold">From one match to a portfolio decision</h2>
+          <p className="mt-3 max-w-[68ch] text-ink-2">
+            The same rules and results feed four tools for the people who decide where laboratory budgets and logistics effort go. The examples below
+            are computed from the synthetic demo data when this page is built.
+          </p>
+          <dl className="mt-8 grid gap-px border border-rule bg-rule md:grid-cols-2">
+            {TOOLS.map((t) => (
+              <div key={t.title} className="bg-panel p-5">
+                <dt>
+                  <Link href={t.href} className="wide text-lg font-bold hover:text-copper">{t.title}</Link>
+                </dt>
+                <dd className="mt-1.5 text-sm text-ink-2">{t.text}</dd>
+              </div>
+            ))}
+          </dl>
+        </section>
+
         {/* Scoring */}
-        <section className="mx-auto grid max-w-[1180px] gap-10 px-4 py-16 md:px-8 lg:grid-cols-[1fr_1.3fr]">
+        <section className="border-t border-rule">
+        <div className="mx-auto grid max-w-[1180px] gap-10 px-4 py-16 md:px-8 lg:grid-cols-[1fr_1.3fr]">
           <div>
             <h2 className="wide text-3xl font-bold">A score you can recompute by hand</h2>
             <p className="mt-3 text-ink-2">
@@ -198,6 +257,7 @@ export default function LandingPage() {
               ))}
             </tbody>
           </table>
+        </div>
         </section>
 
         {/* Use cases */}
@@ -207,11 +267,11 @@ export default function LandingPage() {
             <dl className="mt-8 grid gap-8 md:grid-cols-3">
               <div>
                 <dt className="font-semibold">By-product coordinators</dt>
-                <dd className="mt-1 text-sm text-ink-2">See which pathways are worth a laboratory budget, and which tests unlock the most candidates.</dd>
+                <dd className="mt-1 text-sm text-ink-2">See which pathways are worth a laboratory budget, and which single test unlocks the most candidates.</dd>
               </div>
               <div>
-                <dt className="font-semibold">Sustainability and procurement teams</dt>
-                <dd className="mt-1 text-sm text-ink-2">Compare pathways under explicit transport and price assumptions instead of headline claims.</dd>
+                <dt className="font-semibold">Group sustainability and procurement teams</dt>
+                <dd className="mt-1 text-sm text-ink-2">Compare pathways across companies under explicit transport and price assumptions, and see where each case stops paying.</dd>
               </div>
               <div>
                 <dt className="font-semibold">Technical reviewers</dt>

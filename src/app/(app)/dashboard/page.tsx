@@ -15,7 +15,12 @@ export default function DashboardPage() {
       <PageHeader
         title="Overview"
         lede="Every figure on this page is computed from the current records by running the matching engine under baseline assumptions. Demo records are synthetic, so these are screening results, not industrial outcomes."
-        actions={<ButtonLink href="/match" variant="primary">Run a match analysis</ButtonLink>}
+        actions={
+          <>
+            <ButtonLink href="/portfolio">Group portfolio</ButtonLink>
+            <ButtonLink href="/match" variant="primary">Run a match analysis</ButtonLink>
+          </>
+        }
       />
       <Suspense fallback={<p className="text-ink-3">Screening materials…</p>}>
         <DashboardContent />

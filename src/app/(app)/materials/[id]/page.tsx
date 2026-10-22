@@ -79,6 +79,7 @@ async function MaterialContent({ params, searchParams }: { params: Promise<{ id:
         actions={
           <>
             <ButtonLink href={`/materials/${material.id}/edit`}>Edit profile</ButtonLink>
+            <ButtonLink href={`/materials/${material.id}/passport`}>Evidence passport</ButtonLink>
             <ButtonLink href={`/scenarios?material=${material.id}`}>Explore scenarios</ButtonLink>
             <form action={runMatchAction}>
               <input type="hidden" name="materialId" value={material.id} />
@@ -190,7 +191,19 @@ async function MaterialContent({ params, searchParams }: { params: Promise<{ id:
         </div>
 
         <aside className="space-y-6">
-          <Panel title="Missing information" aside={`${missingList.length} item(s)`}>
+          <Panel
+            title="Missing information"
+            aside={
+              missingList.length ? (
+                <>
+                  {missingList.length} item(s),{" "}
+                  <Link href={`/test-plan?material=${material.id}`} className="text-copper hover:underline">test plan</Link>
+                </>
+              ) : (
+                "0 item(s)"
+              )
+            }
+          >
             {screen?.invalid ? (
               <p className="text-sm text-oxide">{screen.invalid}</p>
             ) : missingList.length === 0 ? (

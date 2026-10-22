@@ -4,6 +4,7 @@ import { Suspense } from "react";
 import { BridgeSpan } from "@/components/bridge-span";
 import { ShortlistControls } from "@/components/shortlist-controls";
 import { ButtonLink, ConfidenceTag, EmptyState, PageHeader, ScoreFigure, StateBadge, buttonStyles, cx } from "@/components/ui";
+import { rankRobustness } from "@/domain/engine/robustness";
 import { lowerFirst } from "@/domain/labels";
 import { fmtDateTime, fmtInr, fmtNumber, fmtPct } from "@/lib/format";
 import { isInScope } from "@/server/analysis";
@@ -27,6 +28,9 @@ async function RunContent({ params, searchParams }: { params: Promise<{ runId: s
   const { repo } = await requireContext();
   const [run, shortlist] = await Promise.all([repo.getRun(runId), repo.listShortlist()]);
   if (!run) notFound();
+  const otherRuns = (await repo.listRuns({ materialId: run.materialId, limit: 20 })).filter((x) => x.id !== run.id);
+  const robust = rankRobustness(run.results, run.weights);
+  const rangeOf = new Map(robust.candidates.map((c) => [c.applicationId, c]));
   const apps = new Map(run.applicationsSnapshot.map((a) => [a.id, a]));
   const entries = new Map(shortlist.filter((s) => s.materialId === run.materialId).map((s) => [s.applicationId, s]));
 
@@ -75,6 +79,38 @@ async function RunContent({ params, searchParams }: { params: Promise<{ runId: s
       <p className="mb-4 font-mono text-xs text-ink-3">
         {run.engineVersion}, {run.scoringModelVersion}, input fingerprint {run.inputHash}
       </p>
+
+      {(robust.status !== "not_applicable" && robust.leader) || otherRuns.length ? (
+        <div className="mb-4 grid gap-3 lg:grid-cols-[1.6fr_1fr]">
+          {robust.status !== "not_applicable" && robust.leader ? (
+            <section aria-label="Ranking robustness" className={cx("border px-4 py-3 text-sm", robust.status === "stable" ? "border-verdigris/40 bg-verdigris-wash" : "border-ochre/40 bg-ochre-wash")}>
+              <div className={cx("font-semibold", robust.status === "stable" ? "text-verdigris" : "text-ochre")}>
+                {robust.status === "stable" ? "Ranking holds when the weights change" : "Ranking depends on the weights"}
+              </div>
+              <p className="mt-0.5 text-ink-2">
+                {robust.status === "stable"
+                  ? `${apps.get(robust.leader)?.name} stays first under all ${robust.variants} weight sets tested: the run's own, equal weights, and each weight halved or raised by half.`
+                  : `${apps.get(robust.leader)?.name} leads with the run's weights but not under ${robust.overturnedBy.length} of ${robust.variants} weight sets (${robust.overturnedBy.slice(0, 3).join("; ")}${robust.overturnedBy.length > 3 ? "; …" : ""}). Treat the order of the top candidates as a judgement call.`}
+              </p>
+            </section>
+          ) : (
+            <div />
+          )}
+          {otherRuns.length ? (
+            <form method="get" action={`/match/runs/${run.id}/compare`} className="flex flex-wrap items-end gap-2 border border-rule bg-panel px-4 py-3" aria-label="Compare with another run">
+              <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-ink-2">
+                Compare with another run of this material
+                <select name="with" className="border border-rule-strong bg-panel px-2 py-1.5 text-sm">
+                  {otherRuns.map((o) => (
+                    <option key={o.id} value={o.id}>{o.label}, {fmtDateTime(o.createdAt)}</option>
+                  ))}
+                </select>
+              </label>
+              <button type="submit" className={buttonStyles.secondary}>Compare runs</button>
+            </form>
+          ) : null}
+        </div>
+      ) : null}
 
       <form method="get" className="mb-4 grid gap-3 border border-rule bg-panel p-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-[repeat(5,minmax(0,1fr))_auto]" aria-label="Filter candidates">
         <label className="flex flex-col gap-1 text-xs text-ink-2">
@@ -185,6 +221,13 @@ async function RunContent({ params, searchParams }: { params: Promise<{ runId: s
                   <div className="flex flex-row items-start justify-between gap-2 lg:flex-col lg:items-end">
                     <ScoreFigure score={r.score} />
                     <ConfidenceTag confidence={r.score.confidence} />
+                    {rangeOf.get(r.applicationId) ? (
+                      <span className="text-xs text-ink-3 lg:text-right" title="Across every weight set tested">
+                        {rangeOf.get(r.applicationId)!.bestRank === rangeOf.get(r.applicationId)!.worstRank
+                          ? `Rank ${rangeOf.get(r.applicationId)!.bestRank} under all weights`
+                          : `Rank ${rangeOf.get(r.applicationId)!.bestRank}–${rangeOf.get(r.applicationId)!.worstRank} as weights vary`}
+                      </span>
+                    ) : null}
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-3 border-t border-rule bg-panel-sunk px-4 py-2">

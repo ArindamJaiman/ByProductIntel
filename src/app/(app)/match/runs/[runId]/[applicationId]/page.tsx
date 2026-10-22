@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { anchorFor, BridgeSpan } from "@/components/bridge-span";
+import { SensitivityPanel } from "@/components/sensitivity-panel";
 import { ShortlistControls } from "@/components/shortlist-controls";
 import { SubmitButton } from "@/components/submit-button";
 import {
@@ -20,6 +21,7 @@ import {
   th,
 } from "@/components/ui";
 import type { Check, CheckStage } from "@/domain/engine/result-types";
+import { breakEven, sensitivity } from "@/domain/engine/sensitivity";
 import { BRIDGE_CATEGORY_LABELS, REVIEWER_LABELS } from "@/domain/labels";
 import { SHORTLIST_STATUS_LABELS } from "@/domain/records";
 import { ECONOMIC_ANCHORS_INR_PER_T } from "@/domain/scoring-config";
@@ -67,6 +69,9 @@ async function DetailContent({ params }: { params: Promise<{ runId: string; appl
   const e = r.economics;
   const blockers = r.bridge.filter((b) => b.blocking && b.category !== "human_review");
   const fits = r.checks.filter((c) => c.status === "pass" && c.stage === "specification");
+
+  const be = breakEven(r, app);
+  const bars = e.annualNetInr === null ? [] : sensitivity(m, app, e.assumptions, run.weights);
 
   const stages = (Object.keys(STAGE_TITLES) as CheckStage[]).map((s) => ({ stage: s, checks: r.checks.filter((c) => c.stage === s) })).filter((s) => s.checks.length);
 
@@ -302,7 +307,9 @@ async function DetailContent({ params }: { params: Promise<{ runId: string; appl
       </div>
 
       <div className="mt-6 space-y-6">
-          {/* 3. Checks */}
+        <SensitivityPanel be={be} bars={bars} baseAnnualInr={e.annualNetInr} baseState={r.state} />
+
+        {/* 3. Checks */}
         <Panel title="Eligibility and technical checks" aside="Hard constraints are applied before any scoring">
           <div className="space-y-5">
             {stages.map(({ stage, checks }) => (

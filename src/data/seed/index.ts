@@ -4,7 +4,7 @@ import { APPLICATIONS } from "./applications";
 import { EVIDENCE_SOURCES } from "./evidence";
 import { MATERIALS, ORGANISATIONS } from "./materials";
 
-export const SEED_VERSION = "seed-2026.10.14";
+export const SEED_VERSION = "seed-2026.10.22";
 
 export const DEFAULT_SCENARIO: Scenario = {
   label: "Baseline assumptions",
