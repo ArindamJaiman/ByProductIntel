@@ -6,13 +6,14 @@
  * This verifies the SQL and policies; it does not exercise Supabase Auth,
  * PostgREST or the network path.
  */
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { PGlite } from "@electric-sql/pglite";
 import { beforeAll, describe, expect, it } from "vitest";
 
 const ORG_A = "00000000-0000-0000-0000-00000000000a";
 const ORG_B = "00000000-0000-0000-0000-00000000000b";
+const ORG_C = "00000000-0000-0000-0000-00000000000c";
 const USER_A = "10000000-0000-0000-0000-00000000000a";
 const USER_B = "10000000-0000-0000-0000-00000000000b";
 
@@ -57,11 +58,14 @@ const insertMaterial = (code: string, org: string, extra = "") =>
 beforeAll(async () => {
   db = new PGlite();
   await db.exec(AUTH_STUB);
-  const migration = readFileSync(join(process.cwd(), "supabase/migrations/20261014000000_initial_schema.sql"), "utf8");
-  await db.exec(migration);
+  // Apply every migration in filename order, as Supabase does.
+  const dir = join(process.cwd(), "supabase/migrations");
+  for (const file of readdirSync(dir).filter((f) => f.endsWith(".sql")).sort()) {
+    await db.exec(readFileSync(join(dir, file), "utf8"));
+  }
   await db.exec(`
     insert into auth.users values ('${USER_A}'), ('${USER_B}');
-    insert into public.organisations (id, name) values ('${ORG_A}', 'Org A'), ('${ORG_B}', 'Org B');
+    insert into public.organisations (id, name) values ('${ORG_A}', 'Org A'), ('${ORG_B}', 'Org B'), ('${ORG_C}', 'Org C');
     insert into public.profiles (id, organisation_id) values ('${USER_A}', '${ORG_A}'), ('${USER_B}', '${ORG_B}');
     insert into public.evidence_sources (id, title, organisation, url, access_date, evidence_type, claim, review_status)
       values ('src-1', 'T', 'O', 'https://example.org', '2026-10-14', 'peer_reviewed', 'c', 'full_text_reviewed');
@@ -93,6 +97,13 @@ describe("row-level security (PGlite)", () => {
       (await db.query<{ code: string }>("select code from public.byproduct_materials order by code")).rows.map((r) => r.code),
     );
     expect(codes).toEqual(["A-PRIVATE", "B-SHARED"]);
+  });
+
+  it("a user can read the names of organisations that share materials, and no others", async () => {
+    const names = await as(USER_A, async () =>
+      (await db.query<{ name: string }>("select name from public.organisations order by name")).rows.map((r) => r.name),
+    );
+    expect(names).toEqual(["Org A", "Org B"]);
   });
 
   it("anonymous sessions see nothing", async () => {

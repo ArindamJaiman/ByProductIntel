@@ -9,7 +9,7 @@ import { runMatching } from "@/domain/engine/run";
 import { DEFAULT_ASSUMPTIONS, DEFAULT_WEIGHTS, normaliseWeights } from "@/domain/scoring-config";
 import type { Material, Scenario } from "@/domain/types";
 import { materialInputSchema, validateMaterial, type MaterialInput } from "@/domain/validation";
-import { getContext } from "./context";
+import { canEditMaterial, getContext } from "./context";
 import { routedLegs } from "./routing";
 
 export interface FormState {
@@ -74,12 +74,14 @@ function parseMaterialPayload(raw: FormDataEntryValue | null): { input?: Materia
 }
 
 export async function saveMaterialAction(_prev: FormState, formData: FormData): Promise<FormState> {
-  const { repo, actor } = await actorContext();
+  const ctx = await actorContext();
+  const { repo, actor } = ctx;
   const { input, state } = parseMaterialPayload(formData.get("payload"));
   if (!input) return state!;
   const id = String(formData.get("materialId") ?? "");
   const existing = id ? await repo.getMaterial(id) : null;
   if (id && !existing) return { ok: false, message: "This material no longer exists." };
+  if (existing && !canEditMaterial(ctx, existing)) return { ok: false, message: "This material is shared by another organisation and is read-only for you." };
   const guard = verificationGuard(input, existing);
   if (Object.keys(guard).length) return { ok: false, message: "Some values are invalid.", fieldErrors: guard };
   let savedId: string;

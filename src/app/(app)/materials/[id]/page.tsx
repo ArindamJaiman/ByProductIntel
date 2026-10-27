@@ -10,7 +10,7 @@ import { unitLabel } from "@/domain/units";
 import { fmtDateTime, fmtInr, fmtNumber, fmtTonnes } from "@/lib/format";
 import { runMatchAction } from "@/server/actions";
 import { baselineScreen } from "@/server/analysis";
-import { requireContext } from "@/server/context";
+import { canEditMaterial, requireContext } from "@/server/context";
 
 export const metadata = { title: "Material profile" };
 
@@ -38,9 +38,11 @@ export default function MaterialPage({ params, searchParams }: { params: Promise
 
 async function MaterialContent({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ saved?: string }> }) {
   const [{ id }, sp] = await Promise.all([params, searchParams]);
-  const { repo } = await requireContext();
+  const ctx = await requireContext();
+  const { repo } = ctx;
   const [material, { screens, applications }, runs] = await Promise.all([repo.getMaterial(id), baselineScreen(repo), repo.listRuns({ materialId: id, limit: 5 })]);
   if (!material) notFound();
+  const editable = canEditMaterial(ctx, material);
   const screen = screens.find((s) => s.material.id === id);
   const appById = new Map(applications.map((a) => [a.id, a]));
 
@@ -76,14 +78,24 @@ async function MaterialContent({ params, searchParams }: { params: Promise<{ id:
             : "Material profile saved."}
         </p>
       ) : null}
+      {!editable ? (
+        <p className="mb-4 border border-rule bg-panel-sunk px-4 py-2 text-sm text-ink-2">
+          Shared by another organisation, so it is read-only here. To edit values or read lab reports into a profile,{" "}
+          <Link href="/materials/new" className="text-copper hover:underline">add your own material</Link>.
+        </p>
+      ) : null}
       <PageHeader
         kicker={<Link href="/materials" className="hover:text-copper">Materials registry</Link>}
         title={material.name}
         lede={material.description || undefined}
         actions={
           <>
-            <ButtonLink href={`/materials/${material.id}/edit`}>Edit profile</ButtonLink>
-            <ButtonLink href={`/materials/${material.id}/read-report`}>Read a lab report</ButtonLink>
+            {editable ? (
+              <>
+                <ButtonLink href={`/materials/${material.id}/edit`}>Edit profile</ButtonLink>
+                <ButtonLink href={`/materials/${material.id}/read-report`}>Read a lab report</ButtonLink>
+              </>
+            ) : null}
             <ButtonLink href={`/materials/${material.id}/passport`}>Evidence passport</ButtonLink>
             <ButtonLink href={`/scenarios?material=${material.id}`}>Explore scenarios</ButtonLink>
             <form action={runMatchAction}>

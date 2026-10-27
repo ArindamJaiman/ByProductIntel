@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { ReportReader } from "@/components/report-reader";
 import { EmptyState, PageHeader } from "@/components/ui";
-import { requireContext } from "@/server/context";
+import { canEditMaterial, requireContext } from "@/server/context";
 import { readerConfigured, readerProviders } from "@/server/reading";
 
 export const metadata = { title: "Read a lab report" };
@@ -26,9 +26,10 @@ export default function ReadReportPage({ params }: { params: Promise<{ id: strin
 
 async function ReadReportContent({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { repo } = await requireContext();
-  const material = await repo.getMaterial(id);
+  const ctx = await requireContext();
+  const material = await ctx.repo.getMaterial(id);
   if (!material) notFound();
+  const editable = canEditMaterial(ctx, material);
 
   return (
     <>
@@ -37,7 +38,12 @@ async function ReadReportContent({ params }: { params: Promise<{ id: string }> }
         title="Read a lab report"
         lede="Upload a laboratory report and its printed results are transcribed into a draft. You check each value against the report before anything is saved; the engine never uses a value nobody confirmed."
       />
-      {readerConfigured() ? (
+      {!editable ? (
+        <EmptyState title="This material is read-only for your organisation">
+          It is shared by another organisation, so only they can change it.{" "}
+          <Link href="/materials/new" className="text-copper underline">Add your own material</Link> to edit values or read lab reports into it.
+        </EmptyState>
+      ) : readerConfigured() ? (
         <div className="space-y-4">
           <details className="border border-rule bg-panel-sunk px-4 py-2.5 text-sm text-ink-2">
             <summary className="cursor-pointer font-semibold text-ink">What the reader may and may not do</summary>

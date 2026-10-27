@@ -19,7 +19,7 @@ import { isUnitId } from "@/domain/units";
 import { materialInputSchema, validateMaterial } from "@/domain/validation";
 import { fmtDate } from "@/lib/format";
 import type { FormState } from "./actions";
-import { getContext } from "./context";
+import { canEditMaterial, getContext } from "./context";
 import { MAX_REPORT_BYTES, READABLE_TYPES, ReadingError, readerConfigured, transcribeReport } from "./reading";
 import { allow } from "./rate-limit";
 
@@ -37,11 +37,13 @@ async function signedIn() {
 
 /** Send an uploaded report to the reading service and check what comes back. Nothing is saved. */
 export async function readReportAction(_prev: ReadState, formData: FormData): Promise<ReadState> {
-  const { repo, actor } = await signedIn();
+  const ctx = await signedIn();
+  const { repo, actor } = ctx;
   if (!readerConfigured()) return { ok: false, message: "The lab report reader is not configured on this server." };
 
   const material = await repo.getMaterial(String(formData.get("materialId") ?? ""));
   if (!material) return { ok: false, message: "This material no longer exists." };
+  if (!canEditMaterial(ctx, material)) return { ok: false, message: "This material is shared by another organisation and is read-only for you." };
 
   const file = formData.get("report");
   if (!(file instanceof File) || file.size === 0) return { ok: false, message: "Choose a report to read." };
@@ -92,7 +94,8 @@ const confirmSchema = z.object({
 
 /** Save the values a person ticked and confirmed, through the same validation as the material form. */
 export async function saveReportValuesAction(_prev: FormState, formData: FormData): Promise<FormState> {
-  const { repo, actor } = await signedIn();
+  const ctx = await signedIn();
+  const { repo, actor } = ctx;
   let json: unknown;
   try {
     json = JSON.parse(String(formData.get("payload") ?? ""));
@@ -107,6 +110,7 @@ export async function saveReportValuesAction(_prev: FormState, formData: FormDat
   const { materialId, fileName, values, document } = parsed.data;
   const material = await repo.getMaterial(materialId);
   if (!material) return { ok: false, message: "This material no longer exists." };
+  if (!canEditMaterial(ctx, material)) return { ok: false, message: "This material is shared by another organisation and is read-only for you." };
 
   const input = applyConfirmedValues(material, values as ConfirmedValue[], document as ReportDocument | null, {
     documentId: `doc-${randomUUID().slice(0, 8)}`,

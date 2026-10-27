@@ -6,6 +6,7 @@ import { dataMode } from "./config";
 import { demoRepository } from "./repository/demo";
 import { supabaseRepository } from "./repository/supabase";
 import type { Actor, Repository } from "./repository/types";
+import type { Material } from "@/domain/types";
 import { createSupabaseServerClient } from "./supabase/client";
 
 export interface RequestContext {
@@ -36,6 +37,16 @@ export const getContext = cache(async (): Promise<RequestContext> => {
     : null;
   return { mode: "supabase", repo: supabaseRepository(db), actor };
 });
+
+/**
+ * Whether this request may change a material. In demo mode every record is
+ * editable. In persistent mode only the owning organisation may edit; materials
+ * other organisations share are read-only (row-level security enforces the
+ * same rule in the database).
+ */
+export function canEditMaterial(ctx: Pick<RequestContext, "mode" | "actor">, material: Pick<Material, "organisationId">): boolean {
+  return ctx.mode === "demo" || (ctx.actor !== null && ctx.actor.organisationId === material.organisationId);
+}
 
 /** For pages: in persistent mode, send signed-out users (or users without a profile) to sign in. */
 export async function requireContext(): Promise<RequestContext & { actor: Actor }> {
