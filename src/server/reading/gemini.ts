@@ -1,35 +1,21 @@
 import "server-only";
-import { readingInstructions, readingJsonSchema, readingSchema, type ReportReading } from "@/domain/report-reading";
+import { readingInstructions, readingJsonSchema } from "@/domain/report-reading";
+import { ReadingError, externalServicesDisabled, parseReading, type ProviderReading } from "./shared";
 
 /**
- * Google Gemini client for transcribing lab reports. Server-side only: the
- * key is read from GEMINI_API_KEY and never sent to the browser. Requests go
- * straight to the public REST endpoint; no SDK is needed.
+ * Google Gemini reader. Server-side only: the key is read from GEMINI_API_KEY
+ * and never sent to the browser. Requests go straight to the public REST
+ * endpoint; no SDK is needed.
  */
 
 const ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models";
+const DEFAULT_MODEL = "gemini-flash-latest";
 const FALLBACK_MODEL = "gemini-2.5-flash";
 const TIMEOUT_MS = 50_000;
-
-export const READABLE_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/webp"] as const;
-/** Kept under Vercel's 4.5 MB request limit, with room for form overhead. */
-export const MAX_REPORT_BYTES = 4 * 1024 * 1024;
-
-/** Outside services can be switched off without removing keys, e.g. for offline tests or a locked-down demo. */
-export const externalServicesDisabled = () => process.env.BPI_DISABLE_EXTERNAL_SERVICES === "1";
 
 export function geminiConfigured(): boolean {
   return !externalServicesDisabled() && Boolean(process.env.GEMINI_API_KEY?.trim());
 }
-
-export class ReadingError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "ReadingError";
-  }
-}
-
-const DEFAULT_MODEL = "gemini-flash-latest";
 
 /** Model ids to try in order. A display name such as "Gemini 3.8" is normalised; an unusable one is skipped at call time. */
 function models(): string[] {
@@ -56,13 +42,13 @@ async function call(model: string, body: unknown, key: string): Promise<{ status
 }
 
 /**
- * Transcribe a lab report. Retries once on the fallback model when the first
- * is overloaded or rate-limited. The model's JSON is validated before use;
- * anything malformed is rejected rather than repaired.
+ * Transcribe a lab report with Gemini, reading the file directly. Retries on
+ * the fallback model when the first is overloaded, rate-limited or not
+ * available to this key.
  */
-export async function transcribeReport(bytes: Uint8Array, mimeType: string): Promise<{ reading: ReportReading; model: string }> {
+export async function readWithGemini(bytes: Uint8Array, mimeType: string): Promise<ProviderReading> {
   const key = process.env.GEMINI_API_KEY?.trim();
-  if (!key || !geminiConfigured()) throw new ReadingError("The lab report reader is not configured on this server.");
+  if (!key || !geminiConfigured()) throw new ReadingError("Gemini is not configured.");
 
   const body = {
     systemInstruction: { parts: [{ text: readingInstructions() }] },
@@ -85,38 +71,31 @@ export async function transcribeReport(bytes: Uint8Array, mimeType: string): Pro
     try {
       ({ status, json } = await call(model, body, key));
     } catch (e) {
-      last = (e as Error).name === "TimeoutError" ? "The reading service took too long to answer." : "The reading service could not be reached.";
+      last = (e as Error).name === "TimeoutError" ? "Gemini took too long to answer." : "Gemini could not be reached.";
       continue;
     }
     if (status === 429 || status >= 500) {
-      last = status === 429 ? "The free reading quota is used up for now. Try again in a few minutes." : "The reading service is busy. Try again shortly.";
+      last = status === 429 ? "Gemini's free quota is used up for now." : "Gemini is busy.";
       continue;
     }
     if ((status === 400 && /model/i.test(json.error?.message ?? "")) || status === 404) {
       // GEMINI_MODEL names a model this key cannot use; fall through to the default.
-      console.warn(`[lab-report] model "${model}" is not available (HTTP ${status}); trying the next model.`);
-      last = "The configured reading model is not available.";
+      console.warn(`[lab-report] Gemini model "${model}" is not available (HTTP ${status}); trying the next model.`);
+      last = "The configured Gemini model is not available.";
       continue;
     }
     if (status !== 200) {
-      console.error(`[lab-report] ${model} returned HTTP ${status}: ${json.error?.status ?? ""} ${json.error?.message?.slice(0, 300) ?? ""} (${bytes.byteLength} bytes, ${mimeType})`);
-      throw new ReadingError(status === 400 ? "The file could not be read. Upload a PDF or a clear image of the report." : `The reading service refused the request (HTTP ${status}).`);
+      console.error(`[lab-report] Gemini ${model} returned HTTP ${status}: ${json.error?.status ?? ""} ${json.error?.message?.slice(0, 300) ?? ""} (${bytes.byteLength} bytes, ${mimeType})`);
+      const keyProblem = status === 401 || status === 403 || /api key/i.test(json.error?.message ?? "");
+      throw new ReadingError(keyProblem ? "Gemini rejected the API key." : status === 400 ? "Gemini could not read the file." : `Gemini refused the request (HTTP ${status}).`);
     }
-    if (json.promptFeedback?.blockReason) throw new ReadingError("The reading service declined to process this file.");
-    const text = json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "";
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(text);
-    } catch {
-      last = "The reading service returned an answer that could not be understood.";
+    if (json.promptFeedback?.blockReason) throw new ReadingError("Gemini declined to process this file.");
+    const reading = parseReading(json.candidates?.[0]?.content?.parts?.map((p) => p.text ?? "").join("") ?? "");
+    if (!reading) {
+      last = "Gemini returned an answer that could not be used.";
       continue;
     }
-    const checked = readingSchema.safeParse(parsed);
-    if (!checked.success) {
-      last = "The reading service returned an answer in an unexpected shape.";
-      continue;
-    }
-    return { reading: checked.data, model: json.modelVersion ?? model };
+    return { reading, provider: "Gemini", model: json.modelVersion ?? model, documentText: null };
   }
-  throw new ReadingError(last || "The report could not be read.");
+  throw new ReadingError(last || "Gemini could not read the report.");
 }

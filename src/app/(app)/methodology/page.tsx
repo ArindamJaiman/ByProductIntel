@@ -193,6 +193,11 @@ export default function MethodologyPage() {
           automatically. Nothing reaches the profile until a person ticks each value and confirms it against the report. Saved values are recorded as
           user-supplied and laboratory-reported, with a note that they were transcribed with AI assistance. The model never scores, ranks or decides.
         </p>
+        <p>
+          If Gemini is busy, out of quota or returns an unusable answer, Mistral AI is used as a backup: its OCR turns the file into text, and a Mistral
+          model transcribes the results from that text into the same structure. Because the document&apos;s own text is then available, each result&apos;s
+          printed name and value must also appear in it before the result can be ticked.
+        </p>
 
         <h3>Road routes</h3>
         <p>

@@ -13,7 +13,18 @@ import { TableWrap, buttonStyles, cx, td, th } from "./ui";
 
 const field = "mt-1 block w-full border border-rule-strong bg-panel px-2 py-1.5 text-sm";
 
-export function ReportReader({ materialId, sampleHref }: { materialId: string; sampleHref: string | null }) {
+const SERVICE_NAMES = { Gemini: "Google's Gemini API", Mistral: "Mistral AI" } as const;
+
+export function ReportReader({
+  materialId,
+  sampleHref,
+  providers,
+}: {
+  materialId: string;
+  sampleHref: string | null;
+  providers: (keyof typeof SERVICE_NAMES)[];
+}) {
+  const services = providers.map((p) => SERVICE_NAMES[p]);
   const [state, readAction, reading] = useActionState(readReportAction, { ok: true } as ReadState);
   const [preview, setPreview] = useState<{ url: string; type: string; name: string } | null>(null);
 
@@ -43,8 +54,9 @@ export function ReportReader({ materialId, sampleHref }: { materialId: string; s
           </button>
         </div>
         <p className="mt-3 text-xs text-ink-3">
-          The file is sent to Google&apos;s Gemini API to transcribe the printed results, and is not stored by this app. On Google&apos;s free tier, uploads
-          may be used to improve its models, so do not upload confidential reports here.
+          The file is sent to {services[0]} to transcribe the printed results
+          {services[1] ? `, or to ${services[1]} if that is unavailable` : ""}, and is not stored by this app. On free tiers, uploads may be used to improve
+          the provider&apos;s models, so do not upload confidential reports here.
           {sampleHref ? (
             <>
               {" "}
@@ -116,7 +128,7 @@ function Review({
         <p className="text-sm text-ink-2">
           {reviewed.length} result{reviewed.length === 1 ? "" : "s"} transcribed from {result.fileName}
           {reading.laboratory ? `, issued by ${reading.laboratory}` : ""}
-          {reading.reportDate ? ` on ${reading.reportDate}` : ""}. Read by {result.model}. Tick only values you have checked against the report.
+          {reading.reportDate ? ` on ${reading.reportDate}` : ""}. Read by {result.provider} ({result.model}). Tick only values you have checked against the report.
         </p>
         {reading.remarks ? <p className="mt-1 text-sm text-ochre">Note from the report: {reading.remarks}</p> : null}
       </div>

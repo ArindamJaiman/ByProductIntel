@@ -147,6 +147,7 @@ export type FindingFlag =
   | "unit_not_recognised"
   | "out_of_range"
   | "value_not_in_quote"
+  | "not_found_in_document"
   | "reported_twice"
   | "differs_from_record";
 
@@ -156,11 +157,15 @@ export const FLAG_TEXT: Record<FindingFlag, string> = {
   unit_not_recognised: "The printed unit does not fit this property.",
   out_of_range: "Outside the physically plausible range for this property.",
   value_not_in_quote: "The number was not found in the quoted line. Check it against the report.",
+  not_found_in_document: "The parameter name or value was not found in the text of the report. Check it against the report.",
   reported_twice: "The report gives this property more than once. Choose one.",
   differs_from_record: "Differs from the value already on the profile.",
 };
 
-const BLOCKING: FindingFlag[] = ["not_in_catalogue", "not_a_single_number", "unit_not_recognised", "out_of_range", "value_not_in_quote"];
+const BLOCKING: FindingFlag[] = ["not_in_catalogue", "not_a_single_number", "unit_not_recognised", "out_of_range", "value_not_in_quote", "not_found_in_document"];
+
+/** Lower-case text with markdown table and emphasis marks and all whitespace removed, for loose containment checks. */
+const compact = (t: string) => t.normalize("NFKC").toLowerCase().replace(/[|*_#`>\\]/g, " ").replace(/\s+/g, "");
 
 export interface ReviewedFinding {
   index: number;
@@ -175,8 +180,13 @@ export interface ReviewedFinding {
   existing: Pick<Measurement, "value" | "unit" | "verification"> | null;
 }
 
-/** Apply the deterministic checks to every transcribed result. */
-export function reviewReading(reading: ReportReading, material: Pick<Material, "measurements">): ReviewedFinding[] {
+/**
+ * Apply the deterministic checks to every transcribed result. When the
+ * provider supplies the document's own text (from OCR), each result's printed
+ * name and value must also appear in it.
+ */
+export function reviewReading(reading: ReportReading, material: Pick<Material, "measurements">, documentText: string | null = null): ReviewedFinding[] {
+  const doc = documentText === null ? null : compact(documentText);
   const counts = new Map<string, number>();
   for (const f of reading.findings) if (isPropertyKey(f.property)) counts.set(f.property, (counts.get(f.property) ?? 0) + 1);
 
@@ -193,6 +203,9 @@ export function reviewReading(reading: ReportReading, material: Pick<Material, "
       if (canonical < def.range.min || canonical > def.range.max) flags.push("out_of_range");
     }
     if (raw.value !== null && !valueAppearsInQuote(raw.value, raw.quote)) flags.push("value_not_in_quote");
+    if (doc !== null && documentText !== null && (!doc.includes(compact(raw.printedName)) || (raw.value !== null && !valueAppearsInQuote(raw.value, documentText)))) {
+      flags.push("not_found_in_document");
+    }
     if (property && (counts.get(property) ?? 0) > 1) flags.push("reported_twice");
     const prev = property ? material.measurements.find((m) => m.property === property) : undefined;
     if (prev && unit && raw.value !== null && (prev.value !== raw.value || prev.unit !== unit)) flags.push("differs_from_record");

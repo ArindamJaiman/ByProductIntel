@@ -20,13 +20,13 @@ import { materialInputSchema, validateMaterial } from "@/domain/validation";
 import { fmtDate } from "@/lib/format";
 import type { FormState } from "./actions";
 import { getContext } from "./context";
-import { MAX_REPORT_BYTES, READABLE_TYPES, ReadingError, geminiConfigured, transcribeReport } from "./gemini";
+import { MAX_REPORT_BYTES, READABLE_TYPES, ReadingError, readerConfigured, transcribeReport } from "./reading";
 import { allow } from "./rate-limit";
 
 export interface ReadState {
   ok: boolean;
   message?: string;
-  result?: { fileName: string; model: string; readAt: string; reading: ReportReading; reviewed: ReviewedFinding[] };
+  result?: { fileName: string; provider: string; model: string; readAt: string; reading: ReportReading; reviewed: ReviewedFinding[] };
 }
 
 async function signedIn() {
@@ -38,7 +38,7 @@ async function signedIn() {
 /** Send an uploaded report to the reading service and check what comes back. Nothing is saved. */
 export async function readReportAction(_prev: ReadState, formData: FormData): Promise<ReadState> {
   const { repo, actor } = await signedIn();
-  if (!geminiConfigured()) return { ok: false, message: "The lab report reader is not configured on this server." };
+  if (!readerConfigured()) return { ok: false, message: "The lab report reader is not configured on this server." };
 
   const material = await repo.getMaterial(String(formData.get("materialId") ?? ""));
   if (!material) return { ok: false, message: "This material no longer exists." };
@@ -54,8 +54,11 @@ export async function readReportAction(_prev: ReadState, formData: FormData): Pr
   }
 
   try {
-    const { reading, model } = await transcribeReport(new Uint8Array(await file.arrayBuffer()), file.type);
-    return { ok: true, result: { fileName: file.name.slice(0, 200), model, readAt: new Date().toISOString(), reading, reviewed: reviewReading(reading, material) } };
+    const { reading, provider, model, documentText } = await transcribeReport(new Uint8Array(await file.arrayBuffer()), file.type);
+    return {
+      ok: true,
+      result: { fileName: file.name.slice(0, 200), provider, model, readAt: new Date().toISOString(), reading, reviewed: reviewReading(reading, material, documentText) },
+    };
   } catch (e) {
     return { ok: false, message: e instanceof ReadingError ? e.message : "The report could not be read." };
   }

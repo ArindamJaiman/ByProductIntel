@@ -56,3 +56,6 @@ __pycache__/
 /skills-lock.json
 /videos/
 *.md
+
+# Windows folder settings
+desktop.ini
